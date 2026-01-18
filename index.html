@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cashwell Group - Personal Money Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav-container">
+        <button class="nav-icon active" data-section="main" title="Main Page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="personal" title="Personal Mode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="history" title="History">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="chat" title="Chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="add" title="Add Entry">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="trophy" title="Trophy">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                <path d="M4 22h16"></path>
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="calendar" title="Calendar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="wallet" title="Wallet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path>
+                <path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path>
+                <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path>
+            </svg>
+        </button>
+        <button class="nav-icon" data-section="group" title="Group Overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+        </button>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="content-container">
+        <!-- Main Page -->
+        <section id="main" class="section active">
+            <h1 class="section-title">Your Personal Money</h1>
+            <div class="summary-card main-card">
+                <div class="card-label">Total Money</div>
+                <div class="card-value" id="totalMoney">$0.00</div>
+            </div>
+            <div class="time-nav">
+                <button class="time-btn active" data-period="daily">Daily</button>
+                <button class="time-btn" data-period="weekly">Weekly</button>
+                <button class="time-btn" data-period="monthly">Monthly</button>
+                <button class="time-btn" data-period="yearly">Yearly</button>
+                <button class="time-btn" data-period="total">Total</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Profit</div>
+                    <div class="stat-value positive" id="mainProfit">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Loss</div>
+                    <div class="stat-value negative" id="mainLoss">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Transactions</div>
+                    <div class="stat-value" id="mainTransactions">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Profit Vandaag</div>
+                    <div class="stat-value positive" id="dailyProfit">$0.00</div>
+                    <div class="stat-subtext">Myself + Group</div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Personal Mode -->
+        <section id="personal" class="section">
+            <h1 class="section-title">Personal Mode</h1>
+            <div class="monthly-profit-summary">
+                <div class="summary-card">
+                    <div class="card-label">Totale Profit Deze Maand</div>
+                    <div class="card-value" id="totalMonthlyProfit">$0.00</div>
+                </div>
+            </div>
+            <div class="profit-overview">
+                <div class="profit-card">
+                    <div class="profit-label">Profit per Day</div>
+                    <div class="profit-value positive" id="profitDay">$0.00</div>
+                    <div class="profit-record">
+                        <span class="record-label">Record:</span>
+                        <span class="record-value" id="recordDay">$0.00</span>
+                    </div>
+                    <canvas id="profitDayChart" class="mini-chart"></canvas>
+                </div>
+                <div class="profit-card">
+                    <div class="profit-label">Profit per Month</div>
+                    <div class="profit-value positive" id="profitMonth">$0.00</div>
+                    <div class="profit-record">
+                        <span class="record-label">Record:</span>
+                        <span class="record-value" id="recordMonth">$0.00</span>
+                    </div>
+                    <canvas id="profitMonthChart" class="mini-chart"></canvas>
+                </div>
+                <div class="profit-card">
+                    <div class="profit-label">Profit per Year</div>
+                    <div class="profit-value positive" id="profitYear">$0.00</div>
+                    <div class="profit-record">
+                        <span class="record-label">Record:</span>
+                        <span class="record-value" id="recordYear">$0.00</span>
+                    </div>
+                    <canvas id="profitYearChart" class="mini-chart"></canvas>
+                </div>
+            </div>
+            <div class="performance-chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+            <div class="year-bars-container" style="margin-top: 2rem; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
+                <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; gap: 1rem;">
+                    <h3>Year Overview</h3>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <button id="yearBarPrev" class="member-time-btn">◀</button>
+                        <span id="yearBarLabel"></span>
+                        <button id="yearBarNext" class="member-time-btn">▶</button>
+                    </div>
+                    <div class="summary-card" style="min-width: 160px;">
+                        <div class="card-label">Total</div>
+                        <div class="card-value" id="yearBarTotal">$0.00</div>
+                    </div>
+                </div>
+                <canvas id="yearBarChart" style="height: 280px;"></canvas>
+            </div>
+            <div class="winrate-container" style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="winrate-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
+                    <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>Winrate Calculator</h3>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top:0.75rem;">
+                        <div>
+                            <label for="winCount" class="form-label">Wins</label>
+                            <input type="number" id="winCount" class="form-input" min="0" step="1" placeholder="0">
+                        </div>
+                        <div>
+                            <label for="lossCount" class="form-label">Losses</label>
+                            <input type="number" id="lossCount" class="form-input" min="0" step="1" placeholder="0">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top:1rem;">
+                        <div class="summary-card">
+                            <div class="card-label">Winrate</div>
+                            <div class="card-value" id="winratePercent">0%</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="card-label">W/L Ratio</div>
+                            <div class="card-value" id="winlossRatio">0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="winrate-tips" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
+                    <h3>Personal Insights</h3>
+                    <ul style="margin-top:0.5rem; color: var(--text-secondary);">
+                        <li>Use Weekly/Monthly to track consistent progress</li>
+                        <li>Check History filters to see patterns per asset</li>
+                        <li>Keep winrate stable above 55–60% for sustainable growth</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- History -->
+        <section id="history" class="section">
+            <h1 class="section-title">History</h1>
+            <div class="search-container">
+                <input type="text" id="historySearch" class="search-input" placeholder="Search history...">
+                <select id="historyFilter" class="filter-select">
+                    <option value="all">All Types</option>
+                    <option value="profit">Profit Only</option>
+                    <option value="loss">Loss Only</option>
+                    <option value="transfer">Transfers Only</option>
+                    <option value="myself">Myself Only</option>
+                    <option value="group">Group Only</option>
+                </select>
+            </div>
+            <div class="history-table-container">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Group / Myself</th>
+                            <th>Asset</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <!-- History entries will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Member Stats Modal -->
+    <div id="memberStatsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 id="memberStatsName">Member Name</h2>
+                <button class="modal-close" id="closeMemberStatsModal">&times;</button>
+            </div>
+            <div class="member-stats-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Given to Group</div>
+                        <div class="stat-value" id="memberGroupAmount">$0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Myself</div>
+                        <div class="stat-value" id="memberMyselfAmount">$0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Net</div>
+                        <div class="stat-value" id="memberTotalAmount">$0.00</div>
+                    </div>
+                </div>
+
+                <div class="time-nav" style="margin-top: 1rem;">
+                    <button class="member-time-btn active" data-period="weekly">Weekly</button>
+                    <button class="member-time-btn" data-period="monthly">Monthly</button>
+                    <button class="member-time-btn" data-period="yearly">Yearly</button>
+                    <button class="member-time-btn" data-period="total">Total</button>
+                </div>
+
+                <div class="chart-container" style="height: 300px; margin-top: 1rem;">
+                    <canvas id="memberStatsChart"></canvas>
+                </div>
+
+                <div class="assets-breakdown" style="margin-top: 2rem;">
+                    <h3>Assets Breakdown</h3>
+                    <div id="memberAssetsList" class="assets-list">
+                        <!-- Assets will be populated here -->
+                    </div>
+                </div>
+
+                <div class="wallet-section" style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 2rem;">
+                    <h3>Wallet Holdings</h3>
+                    <div class="chart-container" style="height: 200px; margin-bottom: 1rem;">
+                        <canvas id="memberWalletChart"></canvas>
+                    </div>
+                    <div id="memberWalletList" class="assets-list">
+                        <!-- Wallet assets will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Chat Modal -->
+    <div id="newChatModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Start Private Chat</h2>
+                <button class="modal-close" id="closeNewChatModal">&times;</button>
+            </div>
+            <div class="chat-member-selection">
+                <div class="form-group">
+                    <label>Select Member:</label>
+                    <div id="chatMemberList" class="member-list-selection">
+                        <!-- Members will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Entry Modal -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Entry</h2>
+                    <button class="modal-close" id="closeEditModal">&times;</button>
+                </div>
+                <form id="editEntryForm" class="entry-form">
+                    <div class="form-group">
+                        <label for="editOwner">Select:</label>
+                        <select id="editOwner" class="form-input" required>
+                            <option value="myself">Myself</option>
+                            <option value="group">Group</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="editMemberSelectionGroup" style="display: none;">
+                        <label for="editMembers">Select Members:</label>
+                        <div id="editMemberCheckboxes" class="member-checkboxes">
+                            <!-- Member checkboxes will be populated here -->
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editAsset">Asset:</label>
+                        <input type="text" id="editAsset" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editType">Type:</label>
+                        <select id="editType" class="form-input" required>
+                            <option value="profit">Profit ($)</option>
+                            <option value="loss">Loss ($)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editAmount">Amount ($):</label>
+                        <input type="number" id="editAmount" class="form-input" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editDate">Date:</label>
+                        <input type="date" id="editDate" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editDescription">Description:</label>
+                        <textarea id="editDescription" class="form-input" rows="3" placeholder="Optional description..."></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" id="cancelEdit">Cancel</button>
+                        <button type="submit" class="btn-save">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Chat -->
+        <section id="chat" class="section">
+            <h1 class="section-title">Chat</h1>
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <div class="chat-header">
+                        <h3>Conversations</h3>
+                        <button class="new-chat-btn" id="newGroupChatBtn">+ New Group Chat</button>
+                    </div>
+                    <div class="chat-list">
+                        <div class="chat-item active" data-chat="group">
+                            <div class="chat-item-info">
+                                <div class="chat-item-name">Pinned Group Chat</div>
+                                <div class="chat-item-preview">Group conversation</div>
+                            </div>
+                            <div class="online-indicator group"></div>
+                        </div>
+                        <div class="chat-item" data-chat="private-1">
+                            <div class="chat-item-info">
+                                <div class="chat-item-name">Member 1</div>
+                                <div class="chat-item-preview">Private conversation</div>
+                            </div>
+                            <div class="online-indicator"></div>
+                        </div>
+                        <div class="chat-item" data-chat="private-2">
+                            <div class="chat-item-info">
+                                <div class="chat-item-name">Member 2</div>
+                                <div class="chat-item-preview">Private conversation</div>
+                            </div>
+                            <div class="online-indicator online"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-main">
+                    <div class="chat-messages" id="chatMessages">
+                        <!-- Messages will be populated here -->
+                    </div>
+                    <div class="chat-input-container">
+                        <button class="chat-send-btn" id="createPollBtn" title="Create Poll" style="margin-right: 0.5rem;" onclick="window.app.openPollModal()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                                <line x1="7" y1="8" x2="17" y2="8"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="7" y1="16" x2="17" y2="16"></line>
+                            </svg>
+                        </button>
+                        <label for="chatImageInput" class="chat-upload-btn" title="Send Image">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                        </label>
+                        <input type="file" id="chatImageInput" accept="image/*,.heic,.heif" style="display: none;" onchange="window.app.handleChatImageUpload(event)">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Type a message...">
+                        <button class="chat-send-btn" id="chatSendBtn" onclick="window.app.sendMessage()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add Entry -->
+        <section id="add" class="section">
+            <h1 class="section-title">Add Entry</h1>
+            <form id="addEntryForm" class="entry-form">
+                <div class="form-group">
+                    <label for="entryOwner">Select:</label>
+                    <select id="entryOwner" class="form-input" required>
+                        <option value="myself">Myself</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="entryAssetType">Asset Type:</label>
+                    <select id="entryAssetType" class="form-input" required>
+                        <option value="custom">Custom Assets</option>
+                        <option value="crypto">Crypto Assets</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="entryAsset">Asset:</label>
+                    <select id="entryAsset" class="form-input">
+                        <option value="">Select or create asset...</option>
+                    </select>
+                    <input type="text" id="newAssetName" class="form-input" placeholder="Or enter new asset name..." style="display: none;">
+                </div>
+                <div id="cryptoPriceDisplay" class="crypto-price-display" style="display: none;">
+                    <span class="price-label">Current Price:</span>
+                    <span id="cryptoPrice" class="price-value">$0.00</span>
+                    <span class="price-update">Updates every 30s</span>
+                </div>
+                <div class="form-group">
+                    <label for="entryType">Type:</label>
+                    <select id="entryType" class="form-input" required>
+                        <option value="profit">Profit ($)</option>
+                        <option value="loss">Loss ($)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="entryAmount">Amount ($):</label>
+                    <input type="number" id="entryAmount" class="form-input" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="entryDate">Date:</label>
+                    <input type="date" id="entryDate" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="entryDescription">Description:</label>
+                    <textarea id="entryDescription" class="form-input" rows="3" placeholder="Optional description..."></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Submit Entry</button>
+            </form>
+        </section>
+
+        <!-- Trophy -->
+        <section id="trophy" class="section">
+            <h1 class="section-title">Trophy</h1>
+            <div class="ranking-mode-selector">
+                <button class="mode-btn active" data-mode="group">Group Ranking</button>
+                <button class="mode-btn" data-mode="rich">Rich Ranking</button>
+            </div>
+            <div class="podium-container">
+                <div class="podium-item second">
+                    <div class="podium-rank">2</div>
+                    <div class="podium-name" id="secondPlace">-</div>
+                    <div class="podium-amount" id="secondAmount">$0.00</div>
+                    <div class="podium-base silver"></div>
+                </div>
+                <div class="podium-item first">
+                    <div class="podium-rank">1</div>
+                    <div class="podium-name" id="firstPlace">-</div>
+                    <div class="podium-amount" id="firstAmount">$0.00</div>
+                    <div class="podium-base gold"></div>
+                </div>
+                <div class="podium-item third">
+                    <div class="podium-rank">3</div>
+                    <div class="podium-name" id="thirdPlace">-</div>
+                    <div class="podium-amount" id="thirdAmount">$0.00</div>
+                    <div class="podium-base bronze"></div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 1rem;">
+                <button class="add-btn" id="trophyViewAllBtn">Bekijk meer</button>
+            </div>
+        </section>
+
+        <!-- Calendar -->
+        <section id="calendar" class="section">
+            <h1 class="section-title">Calendar</h1>
+            <div class="calendar-link-container">
+                <a href="calendar.html" id="calendarLink" class="calendar-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>Open Calendar</span>
+                </a>
+            </div>
+            <div style="margin-top: 2rem;">
+                <button class="add-team-event-btn" id="addTeamEventBtn">+ New Team Event</button>
+                <div class="team-events-container" id="teamEventsContainer" style="margin-top: 2rem;">
+                    <!-- Team events will be populated here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Wallet -->
+        <section id="wallet" class="section">
+            <h1 class="section-title">My Wallet</h1>
+            <div class="wallet-container">
+                <div class="wallet-left-column">
+                    <div class="wallet-summary">
+                        <div class="wallet-card">
+                            <div class="card-label">Total Balance</div>
+                            <div class="card-value" id="walletTotalBalance">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="walletChart"></canvas>
+                    </div>
+                </div>
+                <div class="wallet-assets">
+                    <div class="section-header">
+                        <h3>Assets</h3>
+                        <button class="add-btn" id="addWalletAssetBtn">+ Add Asset</button>
+                        <button class="add-btn" id="transferToGroupBtn" style="margin-left: 0.5rem;">Transfer to Group</button>
+                    </div>
+                    <div class="assets-list" id="walletAssetsList">
+                        <!-- Assets will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Group Overview -->
+        <section id="group" class="section">
+            <h1 class="section-title">Group Overview</h1>
+            <div style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:center;">
+                <div class="group-summary-card">
+                    <div class="card-label">Group Funds (Transfers)</div>
+                    <div class="card-value" id="groupFunds" onclick="window.app.openGroupFundsBreakdown()">$0.00</div>
+                </div>
+            </div>
+            <div style="text-align: center; margin: 1rem 0; display:flex; justify-content:center; gap:0.5rem;">
+            </div>
+            <div class="members-container" id="membersContainer">
+                <!-- Member contributions will be populated here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Auth Gate -->
+    <section id="auth" class="section active">
+        <h1 class="section-title">Sign In</h1>
+        <div class="assets-list" style="max-width: 520px; margin: 0 auto;">
+            <div class="stat-card">
+                <button id="googleSignInBtn" class="add-btn" style="width:100%; justify-content:center;">Continue with Google</button>
+            </div>
+            <div class="stat-card">
+                <form id="authForm" class="entry-form">
+                    <div class="form-group">
+                        <label for="authEmail">Email</label>
+                        <input type="email" id="authEmail" class="form-input" required placeholder="you@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="authPassword">Password</label>
+                        <input type="password" id="authPassword" class="form-input" required placeholder="Your password">
+                    </div>
+                    <div class="form-group">
+                        <label for="authAccessCode">Access Code</label>
+                        <input type="password" id="authAccessCode" class="form-input" required placeholder="Access code">
+                    </div>
+                    <div class="modal-actions" style="justify-content:center;">
+                        <button type="submit" class="btn-save" id="authSubmitBtn">Sign In</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <div id="groupFundsModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>Group Funds Breakdown</h2>
+                <button class="modal-close" id="closeGroupFundsModal" onclick="window.app.closeGroupFundsBreakdown()">&times;</button>
+            </div>
+            <div class="assets-list" id="groupFundsList"></div>
+        </div>
+    </div>
+
+    <!-- Team Event Modal -->
+    <div id="teamEventModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>New Team Event</h2>
+                <button class="modal-close" id="closeTeamEventModal">&times;</button>
+            </div>
+            <form id="teamEventForm" class="entry-form">
+                <div class="form-group">
+                    <label for="teamEventName">Event Name:</label>
+                    <input type="text" id="teamEventName" class="form-input" required placeholder="e.g. Team Meeting">
+                </div>
+                <div class="form-group">
+                    <label for="teamEventDate">Date:</label>
+                    <input type="date" id="teamEventDate" class="form-input" required>
+                </div>
+                <div class="form-group" style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                    <div>
+                        <label for="teamEventStart">Start Time:</label>
+                        <input type="time" id="teamEventStart" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="teamEventEnd">End Time (optional):</label>
+                        <input type="time" id="teamEventEnd" class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="teamEventDescription">Description (optional):</label>
+                    <textarea id="teamEventDescription" class="form-input" rows="3" placeholder="Event description..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" id="cancelTeamEvent">Cancel</button>
+                    <button type="submit" class="btn-save">Add Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Wallet Asset Modal -->
+    <div id="walletAssetModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="walletAssetModalTitle">Add Asset</h2>
+                <button class="modal-close" id="closeWalletAssetModal">&times;</button>
+            </div>
+            <form id="walletAssetForm" class="entry-form">
+                <input type="hidden" id="assetId">
+                
+                <div class="form-group">
+                    <label for="assetType">Asset Type:</label>
+                    <select id="assetType" class="form-input">
+                        <option value="fiat">Fiat / Custom Value</option>
+                        <option value="crypto">Cryptocurrency</option>
+                    </select>
+                </div>
+
+                <!-- Crypto Specific Fields -->
+                <div id="cryptoFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="cryptoSymbol">Cryptocurrency:</label>
+                        <select id="cryptoSymbol" class="form-input">
+                            <option value="bitcoin">Bitcoin (BTC)</option>
+                            <option value="ethereum">Ethereum (ETH)</option>
+                            <option value="solana">Solana (SOL)</option>
+                            <option value="binancecoin">BNB</option>
+                            <option value="ripple">XRP</option>
+                            <option value="cardano">Cardano (ADA)</option>
+                            <option value="dogecoin">Dogecoin (DOGE)</option>
+                            <option value="polkadot">Polkadot (DOT)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assetAmount">Amount (Coins):</label>
+                        <input type="number" id="assetAmount" class="form-input" step="0.00000001" min="0" placeholder="e.g. 1.5">
+                    </div>
+                </div>
+
+                <!-- Fiat/Custom Fields -->
+                <div id="fiatFields">
+                    <div class="form-group">
+                        <label for="assetName">Asset Name:</label>
+                        <input type="text" id="assetName" class="form-input" placeholder="e.g. Cash, Stocks">
+                    </div>
+                    <div class="form-group">
+                        <label for="assetValue">Value ($):</label>
+                        <input type="number" id="assetValue" class="form-input" step="0.01" min="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="assetColor">Color:</label>
+                    <input type="color" id="assetColor" class="form-input" value="#00ffff" style="height: 50px; cursor: pointer;">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" id="cancelWalletAsset">Cancel</button>
+                    <button type="submit" class="btn-save">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="pollModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Poll</h2>
+                <button class="modal-close" id="closePollModal" onclick="window.app.closePollModal()">&times;</button>
+            </div>
+            <div class="entry-form">
+                <div class="form-group">
+                    <label for="pollQuestion">Vraag:</label>
+                    <input type="text" id="pollQuestion" class="form-input" placeholder="Poll vraag">
+                </div>
+                <div class="form-group">
+                    <label for="pollOptions">Opties (één per lijn):</label>
+                    <textarea id="pollOptions" class="form-input" rows="4" placeholder="Optie 1&#10;Optie 2"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" id="cancelPoll" onclick="window.app.closePollModal()">Annuleren</button>
+                    <button type="button" class="btn-save" id="savePoll" onclick="window.app.createPoll()">Aanmaken</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="trophyListModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Ranking</h2>
+                <button class="modal-close" id="closeTrophyListModal">&times;</button>
+            </div>
+            <div id="trophyFullList" class="assets-list"></div>
+        </div>
+    </div>
+
+    <div id="transferModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Transfer to Group</h2>
+                <button class="modal-close" id="closeTransferModal">&times;</button>
+            </div>
+            <div class="entry-form">
+                <div class="form-group">
+                    <label for="transferAsset">Asset:</label>
+                    <select id="transferAsset" class="form-input"></select>
+                </div>
+                <div class="form-group">
+                    <label for="transferAmount">Amount ($):</label>
+                    <input type="number" id="transferAmount" class="form-input" step="0.01" min="0">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" id="cancelTransfer">Annuleren</button>
+                    <button type="button" class="btn-save" id="confirmTransfer">Transfer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>

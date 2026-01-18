@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Neon Calendar - Cashwell Group</title>
+  <link rel="stylesheet" href="calendar-style.css"/>
+</head>
+<body>
+
+<header class="top-bar">
+  <a href="index.html" class="back-to-main">← Back</a>
+  <button id="prevBtn">◀</button>
+  <h1 id="currentLabel"></h1>
+  <button id="nextBtn">▶</button>
+
+  <button id="holidayViewBtn">Holidays</button>
+
+  <div class="view-switch">
+    <button id="monthViewBtn" class="active">Month</button>
+    <button id="weekViewBtn">Week</button>
+  </div>
+</header>
+
+<main>
+  <div id="calendar"></div>
+</main>
+
+<!-- SCHOOLVAKANTIES BEHEREN -->
+<div id="holidayView" class="hidden holiday-view">
+  <button id="backBtn">← Back</button>
+  <h2>Manage School Holidays</h2>
+
+  <label>Year</label>
+  <input type="number" id="holidayYear" value="2025" />
+
+  <label>Holiday name</label>
+  <input id="holidayName" placeholder="e.g. Christmas Break" />
+
+  <label>From</label>
+  <input type="date" id="holidayStart" />
+
+  <label>To</label>
+  <input type="date" id="holidayEnd" />
+
+  <button id="addHolidayBtn">Add Holiday</button>
+
+  <ul id="holidayList"></ul>
+</div>
+
+<button id="addEventBtn" class="fab">＋</button>
+
+<!-- MODAL VOOR EVENT -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+
+    <h2 id="modalTitle">Task</h2>
+
+    <!-- TITEL / BESCHRIJVING -->
+    <label for="titleInput">Title</label>
+    <input id="titleInput" placeholder="Task title" />
+
+    <label for="descInput">Description</label>
+    <textarea id="descInput" placeholder="Description (optional)"></textarea>
+
+    <!-- DATUM -->
+    <label for="dateInput">Date</label>
+    <input type="date" id="dateInput" />
+
+    <!-- TIJD -->
+    <label>Time</label>
+    <div class="time-row">
+      <input type="time" id="startTime" />
+      <input type="time" id="endTime" />
+    </div>
+
+    <!-- HERHALING -->
+    <label for="repeatType">Repeat</label>
+    <select id="repeatType">
+      <option value="none">None</option>
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+
+    <!-- UITGESLOTEN DAGEN -->
+    <label>Exclude weekdays</label>
+    <div id="weekdayExclusions" class="weekday-row">
+      <label><input type="checkbox" value="1"> Mon</label>
+      <label><input type="checkbox" value="2"> Tue</label>
+      <label><input type="checkbox" value="3"> Wed</label>
+      <label><input type="checkbox" value="4"> Thu</label>
+      <label><input type="checkbox" value="5"> Fri</label>
+      <label><input type="checkbox" value="6"> Sat</label>
+      <label><input type="checkbox" value="0"> Sun</label>
+    </div>
+
+    <!-- UITZONDERINGEN MET DATUM-BEREIK -->
+    <label>Exceptions (from … to …)</label>
+    <div class="exception-row">
+      <input type="date" id="exceptionStart" /> t/m
+      <input type="date" id="exceptionEnd" />
+      <label>
+        <input type="checkbox" id="exceptionRepeatYearly" />
+        Jaarlijks herhalen
+      </label>
+      <button type="button" id="addExceptionBtn">Toevoegen</button>
+    </div>
+
+    <ul id="exceptionList">
+      <!-- meerdere uitzonderingen komen hier -->
+    </ul>
+
+    <!-- SPECIFIEKE SCHOOLVAKANTIES OPTIE -->
+    <select id="schoolHolidayMode">
+        <option value="all">Altijd (ook schoolvakanties)</option>
+        <option value="exclude">Niet tijdens schoolvakanties</option>
+        <option value="only">Enkel tijdens schoolvakanties</option>
+    </select>
+      
+
+    <!-- KLEUR -->
+    <label for="colorInput">Kleur</label>
+    <input type="color" id="colorInput" value="#00ffff" />
+
+    <!-- ACTIES -->
+    <div class="modal-actions">
+      <button id="deleteEvent" class="danger hidden">Verwijderen</button>
+      <button id="saveEvent">Opslaan</button>
+      <button id="cancelEvent">Annuleren</button>
+    </div>
+
+  </div>
+</div>
+
+<script src="calendar-script.js"></script>
+</body>
+</html>
