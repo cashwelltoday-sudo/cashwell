@@ -77,10 +77,27 @@ function isToday(date) {
 // Huidige gebruiker ophalen (valt terug op 'member1')
 function getCurrentUserId() { return 'member1'; }
 
+// Get current user email from auth
+function getCurrentUserEmail() {
+  const auth = localStorage.getItem('cashwellAuth');
+  if (auth) {
+    try {
+      const authData = JSON.parse(auth);
+      return authData.email || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
+
 // Calculate profit for a specific date (myself + group entries)
 function calculateProfitForDate(dateStr) {
-  const entries = JSON.parse(localStorage.getItem('cashwellEntries')) || [];
-  const members = JSON.parse(localStorage.getItem('cashwellMembers')) || [];
+  const userEmail = getCurrentUserEmail();
+  const storageKey = userEmail ? `cashwell_${userEmail}_entries` : 'cashwellEntries';
+  const entries = JSON.parse(localStorage.getItem(storageKey)) || [];
+  const membersKey = userEmail ? `cashwell_${userEmail}_members` : 'cashwellMembers';
+  const members = JSON.parse(localStorage.getItem(membersKey)) || [];
   
   // Get myself entries for this date
   const myselfEntries = entries.filter(e => 
@@ -117,7 +134,9 @@ function calculateProfitForDate(dateStr) {
 
 // Calculate total profit for a month
 function calculateMonthlyProfit(year, month) {
-  const entries = JSON.parse(localStorage.getItem('cashwellEntries')) || [];
+  const userEmail = getCurrentUserEmail();
+  const storageKey = userEmail ? `cashwell_${userEmail}_entries` : 'cashwellEntries';
+  const entries = JSON.parse(localStorage.getItem(storageKey)) || [];
   const members = JSON.parse(localStorage.getItem('cashwellMembers')) || [];
   const startOfMonth = new Date(year, month, 1);
   const endOfMonth = new Date(year, month + 1, 0);
@@ -188,7 +207,9 @@ function isDateInException(date, exceptions = []) {
 
 // Get team events from localStorage
 function getTeamEvents() {
-  const teamEvents = JSON.parse(localStorage.getItem('cashwellTeamEvents')) || [];
+  const userEmail = getCurrentUserEmail();
+  const storageKey = userEmail ? `cashwell_${userEmail}_teamEvents` : 'cashwellTeamEvents';
+  const teamEvents = JSON.parse(localStorage.getItem(storageKey)) || [];
   return teamEvents.map(te => ({
     id: `team-${te.id}`,
     title: te.name,

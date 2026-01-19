@@ -2,8 +2,10 @@
 function getCurrentUserId() {
     return 'member1';
 }
+
 class DataManager {
-    constructor() {
+    constructor(userEmail = null) {
+        this.userEmail = userEmail;
         this.entries = this.loadEntries();
         this.customAssets = this.loadCustomAssets();
         this.members = this.loadMembers();
@@ -13,23 +15,38 @@ class DataManager {
         this.migrateGroupLossesToTransfers();
     }
 
+    // Get storage key prefix based on user email
+    getStorageKey(key) {
+        if (this.userEmail) {
+            return `cashwell_${this.userEmail}_${key}`;
+        }
+        return `cashwell_${key}`;
+    }
+
     loadEntries() {
-        return [];
+        const stored = localStorage.getItem(this.getStorageKey('entries'));
+        return stored ? JSON.parse(stored) : [];
     }
 
     saveEntries() {
-        return;
+        localStorage.setItem(this.getStorageKey('entries'), JSON.stringify(this.entries));
     }
 
     loadCustomAssets() {
-        return [];
+        const stored = localStorage.getItem(this.getStorageKey('customAssets'));
+        return stored ? JSON.parse(stored) : [];
     }
 
     saveCustomAssets() {
-        return;
+        localStorage.setItem(this.getStorageKey('customAssets'), JSON.stringify(this.customAssets));
     }
 
     loadMembers() {
+        const stored = localStorage.getItem(this.getStorageKey('members'));
+        if (stored) {
+            return JSON.parse(stored);
+        }
+        // Default members for new users
         return [
             { id: 'member1', name: 'Member 1', amount: 0 },
             { id: 'member2', name: 'Member 2', amount: 0 },
@@ -38,18 +55,19 @@ class DataManager {
     }
 
     saveMembers() {
-        return;
+        localStorage.setItem(this.getStorageKey('members'), JSON.stringify(this.members));
     }
 
     loadWalletAssets() {
-        let assets = [];
+        const stored = localStorage.getItem(this.getStorageKey('walletAssets'));
+        let assets = stored ? JSON.parse(stored) : [];
         // Migration: Ensure all assets have an ownerId (default to member1)
         assets = assets.map(a => ({ ...a, ownerId: a.ownerId || 'member1' }));
         return assets;
     }
 
     saveWalletAssets() {
-        return;
+        localStorage.setItem(this.getStorageKey('walletAssets'), JSON.stringify(this.walletAssets));
     }
 
     addWalletAsset(asset) {
@@ -1230,24 +1248,31 @@ class App {
             this.handleGoogleSignIn(response);
         };
 
-        // Setup manual Google Sign-In button (fallback)
-        const googleBtn = document.getElementById('googleSignInBtn');
-        if (googleBtn) {
-            googleBtn.addEventListener('click', () => {
-                // Show access code prompt directly
-                const accessCode = prompt('Voer je access code in:');
-                if (!accessCode) return;
+        // Initialize Google Sign-In when script loads
+        const initGoogleSignIn = () => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                // Only initialize if client_id is provided (check the data attribute)
+                const gIdOnload = document.getElementById('g_id_onload');
+                const clientId = gIdOnload ? gIdOnload.getAttribute('data-client_id') : '';
                 
-                const role = this.validateAccessCode(accessCode);
-                if (!role) {
-                    alert('Ongeldige access code');
-                    return;
+                if (clientId && clientId.trim() !== '') {
+                    google.accounts.id.initialize({
+                        client_id: clientId,
+                        callback: handleGoogleSignIn
+                    });
+                    google.accounts.id.renderButton(
+                        document.querySelector('.g_id_signin'),
+                        { theme: 'outline', size: 'large' }
+                    );
                 }
-                
-                const rememberLogin = confirm('Wil je ingelogd blijven?');
-                this.login(null, role, rememberLogin);
-            });
-        }
+            } else {
+                // Retry after a short delay if Google API hasn't loaded yet
+                setTimeout(initGoogleSignIn, 100);
+            }
+        };
+        
+        // Start initialization
+        initGoogleSignIn();
 
         const authForm = document.getElementById('authForm');
         if (authForm) {
@@ -1267,7 +1292,9 @@ class App {
                     return;
                 }
                 
-                this.login(null, role, rememberLogin);
+                // For access code only login, use a generated email
+                const email = `user_${Date.now()}@cashwell.local`;
+                this.login(email, role, rememberLogin);
             });
         }
     }
@@ -1282,6 +1309,27 @@ class App {
                     this.isAuthenticated = true;
                     this.userRole = auth.role;
                     this.userEmail = auth.email;
+                    this.userName = auth.name;
+                    
+                    // Initialize DataManager with user email
+                    this.dataManager = new DataManager(auth.email);
+                    
+                    // Setup all features
+                    this.setupNavigation();
+                    this.setupMainPage();
+                    this.setupPersonalMode();
+                    this.setupHistory();
+                    this.setupChat();
+                    this.setupNewChat();
+                    this.setupAddEntry();
+                    this.setupTrophy();
+                    this.setupGroupOverview();
+                    this.setupCalendar();
+                    this.setupMemberStats();
+                    this.setupWallet();
+                    this.startWalletUpdates();
+                    
+                    document.getElementById('auth').classList.remove('active');
                     this.showSection('main');
                     this.updateAll();
                     return true;
@@ -1329,15 +1377,18 @@ class App {
     login(email, role, rememberLogin = false, name = null) {
         this.isAuthenticated = true;
         this.userRole = role;
-        this.userEmail = email;
+        this.userEmail = email || `user_${Date.now()}`; // Fallback if no email
         this.userName = name;
+        
+        // Initialize DataManager with user email
+        this.dataManager = new DataManager(this.userEmail);
         
         // Store auth if rememberLogin is checked
         if (rememberLogin) {
             const expires = new Date();
             expires.setDate(expires.getDate() + 30); // 30 days
             localStorage.setItem('cashwellAuth', JSON.stringify({
-                email: email,
+                email: this.userEmail,
                 role: role,
                 name: name,
                 expires: expires.toISOString()
