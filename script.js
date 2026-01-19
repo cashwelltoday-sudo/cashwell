@@ -1234,8 +1234,8 @@ class App {
         const googleBtn = document.getElementById('googleSignInBtn');
         if (googleBtn) {
             googleBtn.addEventListener('click', () => {
-                // Fallback: show access code prompt directly
-                const accessCode = prompt('Voer je access code in:\n\nEigenaar: CASHwell!6,62.X\nGebruiker: Cashw377!');
+                // Show access code prompt directly
+                const accessCode = prompt('Voer je access code in:');
                 if (!accessCode) return;
                 
                 const role = this.validateAccessCode(accessCode);
@@ -1296,7 +1296,7 @@ class App {
     }
 
     handleGoogleSignIn(response) {
-        if (response.credential) {
+        if (response && response.credential) {
             // Decode JWT token to get user info
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
             const email = payload.email;
@@ -1309,7 +1309,7 @@ class App {
             }
             
             // Show access code prompt after Google login
-            const accessCode = prompt('Voer je access code in:\n\nEigenaar: CASHwell!6,62.X\nGebruiker: Cashw377!');
+            const accessCode = prompt('Voer je access code in:');
             if (!accessCode) {
                 alert('Access code is vereist');
                 return;
