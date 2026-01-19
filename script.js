@@ -1248,14 +1248,44 @@ class App {
             this.handleGoogleSignIn(response);
         };
 
-        // Initialize Google Sign-In when script loads
+        // Initialize Google Sign-In only if client_id is provided
         const initGoogleSignIn = () => {
-            if (typeof google !== 'undefined' && google.accounts) {
-                // Only initialize if client_id is provided (check the data attribute)
-                const gIdOnload = document.getElementById('g_id_onload');
-                const clientId = gIdOnload ? gIdOnload.getAttribute('data-client_id') : '';
+            const gIdOnload = document.getElementById('g_id_onload');
+            const googleContainer = document.getElementById('googleSignInContainer');
+            const authDivider = document.getElementById('authDivider');
+            
+            if (!gIdOnload || !googleContainer) return;
+            
+            const clientId = gIdOnload.getAttribute('data-client_id') || '';
+            
+            // Only show and initialize Google Sign-In if client_id is provided and valid
+            if (clientId && clientId.trim() !== '' && clientId !== 'YOUR_GOOGLE_CLIENT_ID') {
+                // Load Google Sign-In script dynamically only if not already loaded
+                if (typeof google === 'undefined' || !google.accounts) {
+                    // Check if script is already being loaded
+                    if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+                        const script = document.createElement('script');
+                        script.src = 'https://accounts.google.com/gsi/client';
+                        script.async = true;
+                        script.defer = true;
+                        script.onload = () => {
+                            setTimeout(initGoogleSignIn, 200);
+                        };
+                        script.onerror = () => {
+                            // Hide Google Sign-In if script fails to load
+                            googleContainer.style.display = 'none';
+                            authDivider.style.display = 'none';
+                        };
+                        document.head.appendChild(script);
+                    } else {
+                        // Script is loading, retry later
+                        setTimeout(initGoogleSignIn, 200);
+                    }
+                    return;
+                }
                 
-                if (clientId && clientId.trim() !== '') {
+                // Initialize Google Sign-In
+                try {
                     google.accounts.id.initialize({
                         client_id: clientId,
                         callback: handleGoogleSignIn
@@ -1264,15 +1294,24 @@ class App {
                         document.querySelector('.g_id_signin'),
                         { theme: 'outline', size: 'large' }
                     );
+                    // Show Google Sign-In container and divider
+                    googleContainer.style.display = 'block';
+                    authDivider.style.display = 'flex';
+                } catch (error) {
+                    console.error('Google Sign-In initialization error:', error);
+                    // Hide Google Sign-In if initialization fails
+                    googleContainer.style.display = 'none';
+                    authDivider.style.display = 'none';
                 }
             } else {
-                // Retry after a short delay if Google API hasn't loaded yet
-                setTimeout(initGoogleSignIn, 100);
+                // Hide Google Sign-In if no client_id
+                googleContainer.style.display = 'none';
+                authDivider.style.display = 'none';
             }
         };
         
-        // Start initialization
-        initGoogleSignIn();
+        // Start initialization after a short delay to ensure DOM is ready
+        setTimeout(initGoogleSignIn, 100);
 
         const authForm = document.getElementById('authForm');
         if (authForm) {
