@@ -607,26 +607,36 @@ class App {
         this.personalYear = new Date().getFullYear();
         this.isAuthenticated = false;
         this.userRole = 'user';
+        this.userEmail = null;
+        this.userName = null;
+        this.bannedEmails = [];
 
         this.init();
     }
 
     init() {
-        this.setupNavigation();
-        this.setupMainPage();
-        this.setupPersonalMode();
-        this.setupHistory();
-        this.setupChat();
-        this.setupNewChat();
-        this.setupAddEntry();
-        this.setupTrophy();
-        this.setupGroupOverview();
-        this.setupCalendar();
-        this.setupMemberStats();
-        this.setupWallet();
-        this.startWalletUpdates();
         this.setupAuth();
-        this.showSection('auth');
+        
+        // Only setup other features if authenticated
+        if (this.isAuthenticated) {
+            this.setupNavigation();
+            this.setupMainPage();
+            this.setupPersonalMode();
+            this.setupHistory();
+            this.setupChat();
+            this.setupNewChat();
+            this.setupAddEntry();
+            this.setupTrophy();
+            this.setupGroupOverview();
+            this.setupCalendar();
+            this.setupMemberStats();
+            this.setupWallet();
+            this.startWalletUpdates();
+            this.showSection('main');
+            this.updateAll();
+        } else {
+            this.showSection('auth');
+        }
     }
 
     startWalletUpdates() {
@@ -846,7 +856,7 @@ class App {
     }
 
     setupNavigation() {
-        const navButtons = document.querySelectorAll('.nav-icon');
+        const navButtons = document.querySelectorAll('.nav-icon[data-section]');
         navButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!this.isAuthenticated) {
@@ -861,6 +871,16 @@ class App {
                 }
             });
         });
+
+        // Setup logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                if (confirm('Weet je zeker dat je wilt uitloggen?')) {
+                    this.logout();
+                }
+            });
+        }
     }
 
     showSection(sectionId) {
@@ -1200,26 +1220,173 @@ class App {
     }
 
     setupAuth() {
-        const authForm = document.getElementById('authForm');
+        // Check if user is already logged in
+        if (this.checkStoredAuth()) {
+            return; // Already authenticated, skip setup
+        }
+        
+        // Setup Google Sign-In callback (global function)
+        window.handleGoogleSignIn = (response) => {
+            this.handleGoogleSignIn(response);
+        };
+
+        // Setup manual Google Sign-In button (fallback)
         const googleBtn = document.getElementById('googleSignInBtn');
         if (googleBtn) {
             googleBtn.addEventListener('click', () => {
-                alert('Google Sign-In will be enabled with production backend.');
+                // Fallback: show access code prompt directly
+                const accessCode = prompt('Voer je access code in:\n\nEigenaar: CASHwell!6,62.X\nGebruiker: Cashw377!');
+                if (!accessCode) return;
+                
+                const role = this.validateAccessCode(accessCode);
+                if (!role) {
+                    alert('Ongeldige access code');
+                    return;
+                }
+                
+                const rememberLogin = confirm('Wil je ingelogd blijven?');
+                this.login(null, role, rememberLogin);
             });
         }
+
+        const authForm = document.getElementById('authForm');
         if (authForm) {
             authForm.addEventListener('submit', (e) => {
                 e.preventDefault();
-                const email = document.getElementById('authEmail').value.trim();
-                const password = document.getElementById('authPassword').value;
                 const accessCode = document.getElementById('authAccessCode').value;
-                if (!email || !password || !accessCode) return;
-                this.isAuthenticated = true;
-                this.userRole = 'user';
-                this.showSection('main');
-                this.updateAll();
+                const rememberLogin = document.getElementById('rememberLogin').checked;
+                
+                if (!accessCode) {
+                    alert('Voer een access code in');
+                    return;
+                }
+                
+                const role = this.validateAccessCode(accessCode);
+                if (!role) {
+                    alert('Ongeldige access code');
+                    return;
+                }
+                
+                this.login(null, role, rememberLogin);
             });
         }
+    }
+
+    checkStoredAuth() {
+        const storedAuth = localStorage.getItem('cashwellAuth');
+        if (storedAuth) {
+            try {
+                const auth = JSON.parse(storedAuth);
+                // Check if auth hasn't expired (30 days)
+                if (auth.expires && new Date(auth.expires) > new Date()) {
+                    this.isAuthenticated = true;
+                    this.userRole = auth.role;
+                    this.userEmail = auth.email;
+                    this.showSection('main');
+                    this.updateAll();
+                    return true;
+                } else {
+                    localStorage.removeItem('cashwellAuth');
+                }
+            } catch (e) {
+                localStorage.removeItem('cashwellAuth');
+            }
+        }
+        return false;
+    }
+
+    handleGoogleSignIn(response) {
+        if (response.credential) {
+            // Decode JWT token to get user info
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            const email = payload.email;
+            const name = payload.name;
+            
+            // Check if banned
+            if (this.bannedEmails.includes(email)) {
+                alert('Dit account is geblokkeerd. Neem contact op met de eigenaar.');
+                return;
+            }
+            
+            // Show access code prompt after Google login
+            const accessCode = prompt('Voer je access code in:\n\nEigenaar: CASHwell!6,62.X\nGebruiker: Cashw377!');
+            if (!accessCode) {
+                alert('Access code is vereist');
+                return;
+            }
+            
+            const role = this.validateAccessCode(accessCode);
+            if (!role) {
+                alert('Ongeldige access code');
+                return;
+            }
+            
+            const rememberLogin = confirm('Wil je ingelogd blijven?');
+            this.login(email, role, rememberLogin, name);
+        }
+    }
+
+    login(email, role, rememberLogin = false, name = null) {
+        this.isAuthenticated = true;
+        this.userRole = role;
+        this.userEmail = email;
+        this.userName = name;
+        
+        // Store auth if rememberLogin is checked
+        if (rememberLogin) {
+            const expires = new Date();
+            expires.setDate(expires.getDate() + 30); // 30 days
+            localStorage.setItem('cashwellAuth', JSON.stringify({
+                email: email,
+                role: role,
+                name: name,
+                expires: expires.toISOString()
+            }));
+        }
+        
+        // Setup all features after login
+        this.setupNavigation();
+        this.setupMainPage();
+        this.setupPersonalMode();
+        this.setupHistory();
+        this.setupChat();
+        this.setupNewChat();
+        this.setupAddEntry();
+        this.setupTrophy();
+        this.setupGroupOverview();
+        this.setupCalendar();
+        this.setupMemberStats();
+        this.setupWallet();
+        this.startWalletUpdates();
+        
+        // Hide auth section and show main
+        document.getElementById('auth').classList.remove('active');
+        this.showSection('main');
+        this.updateAll();
+    }
+
+    logout() {
+        this.isAuthenticated = false;
+        this.userRole = 'user';
+        this.userEmail = null;
+        this.userName = null;
+        localStorage.removeItem('cashwellAuth');
+        
+        // Hide all sections and show auth
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-icon').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('auth').classList.add('active');
+    }
+
+    validateAccessCode(input) {
+        // Owner code: CASHwell!6,62.X
+        // User code: Cashw377!
+        const ownerCode = 'CASHwell!6,62.X';
+        const userCode = 'Cashw377!';
+        
+        if (input === ownerCode) return 'owner';
+        if (input === userCode) return 'user';
+        return null;
     }
 
     calculateRecordDay() {
@@ -2073,6 +2240,13 @@ class App {
 
         membersContainer.innerHTML = this.dataManager.members.map(member => {
             const percentage = totalAmount > 0 ? (Math.max(0, member.amount) / totalAmount * 100) : 0;
+            const controls = this.userRole === 'owner' ? `
+                <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                    <button class="add-btn owner-edit-amount" data-member-id="${member.id}">Edit Amount</button>
+                    <button class="add-btn owner-kick" data-member-id="${member.id}">Kick</button>
+                    <button class="add-btn owner-ban" data-member-id="${member.id}">Ban</button>
+                </div>
+            ` : '';
             return `
                 <div class="member-card">
                     <div class="member-header">
@@ -2083,9 +2257,61 @@ class App {
                     <div class="progress-bar-container">
                         <div class="progress-bar" style="width: ${percentage}%"></div>
                     </div>
+                    ${controls}
                 </div>
             `;
         }).join('');
+
+        if (this.userRole === 'owner') {
+            membersContainer.querySelectorAll('.owner-edit-amount').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const memberId = btn.dataset.memberId;
+                    const member = this.dataManager.members.find(m => m.id === memberId);
+                    if (!member) return;
+                    const val = prompt('New amount for ' + member.name, member.amount.toString());
+                    if (val === null || val === '') return;
+                    const num = parseFloat(val);
+                    if (isNaN(num)) return;
+                    member.amount = num;
+                    this.dataManager.saveMembers();
+                    this.updateGroupOverview();
+                    this.updateTrophy();
+                });
+            });
+            membersContainer.querySelectorAll('.owner-kick').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const memberId = btn.dataset.memberId;
+                    this.kickMember(memberId);
+                });
+            });
+            membersContainer.querySelectorAll('.owner-ban').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const email = prompt('Enter email to ban permanently');
+                    if (!email) return;
+                    if (!this.bannedEmails.includes(email)) this.bannedEmails.push(email);
+                    alert('User banned: ' + email);
+                });
+            });
+        }
+    }
+
+    kickMember(memberId) {
+        const idx = this.dataManager.members.findIndex(m => m.id === memberId);
+        if (idx === -1) return;
+        this.dataManager.members.splice(idx, 1);
+        this.removeMemberFromEntries(memberId);
+        this.dataManager.saveMembers();
+        this.updateGroupOverview();
+        this.updateTrophy();
+    }
+
+    removeMemberFromEntries(memberId) {
+        this.dataManager.entries.forEach(e => {
+            if (e.owner === 'group' && Array.isArray(e.memberIds)) {
+                e.memberIds = e.memberIds.filter(id => id !== memberId);
+            }
+        });
+        this.dataManager.saveEntries();
     }
 
     async openGroupFundsBreakdown() {
@@ -2945,6 +3171,13 @@ class App {
         }
     }
 }
+
+// Global Google Sign-In callback
+window.handleGoogleSignIn = function(response) {
+    if (window.app) {
+        window.app.handleGoogleSignIn(response);
+    }
+};
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

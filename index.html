@@ -6,6 +6,7 @@
     <title>Cashwell Group - Personal Money Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -69,6 +70,13 @@
                 <circle cx="9" cy="7" r="4"></circle>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+        </button>
+        <button class="nav-icon" id="logoutBtn" title="Logout" style="margin-top: auto;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
         </button>
     </nav>
@@ -584,26 +592,44 @@
     <!-- Auth Gate -->
     <section id="auth" class="section active">
         <h1 class="section-title">Sign In</h1>
-        <div class="assets-list" style="max-width: 520px; margin: 0 auto;">
-            <div class="stat-card">
-                <button id="googleSignInBtn" class="add-btn" style="width:100%; justify-content:center;">Continue with Google</button>
-            </div>
-            <div class="stat-card">
+        <div class="auth-container" style="max-width: 520px; margin: 0 auto;">
+            <div class="auth-card">
+                <div class="google-signin-container" style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+                    <div id="g_id_onload"
+                         data-client_id=""
+                         data-callback="handleGoogleSignIn"
+                         data-auto_prompt="false">
+                    </div>
+                    <div class="g_id_signin"
+                         data-type="standard"
+                         data-size="large"
+                         data-theme="outline"
+                         data-text="sign_in_with"
+                         data-shape="rectangular"
+                         data-logo_alignment="left">
+                    </div>
+                </div>
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <button id="googleSignInBtn" class="add-btn" style="width:100%; justify-content:center; background: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan));">
+                        🔐 Continue with Google
+                    </button>
+                </div>
+                <div class="auth-divider">
+                    <span>of</span>
+                </div>
                 <form id="authForm" class="entry-form">
                     <div class="form-group">
-                        <label for="authEmail">Email</label>
-                        <input type="email" id="authEmail" class="form-input" required placeholder="you@example.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="authPassword">Password</label>
-                        <input type="password" id="authPassword" class="form-input" required placeholder="Your password">
-                    </div>
-                    <div class="form-group">
                         <label for="authAccessCode">Access Code</label>
-                        <input type="password" id="authAccessCode" class="form-input" required placeholder="Access code">
+                        <input type="password" id="authAccessCode" class="form-input" required placeholder="Enter your access code">
+                        <small class="form-hint">Eigenaar: CASHwell!6,62.X | Gebruiker: Cashw377!</small>
                     </div>
-                    <div class="modal-actions" style="justify-content:center;">
-                        <button type="submit" class="btn-save" id="authSubmitBtn">Sign In</button>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="rememberLogin"> Onthoud login
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn-save" id="authSubmitBtn" style="width:100%;">Sign In</button>
                     </div>
                 </form>
             </div>
