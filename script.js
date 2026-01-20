@@ -995,32 +995,13 @@ class App {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // Check stored auth first (this sets isAuthenticated if valid)
-        const wasAuthenticated = this.checkStoredAuth();
+        // Check stored auth AFTER DataManager is ready
+        // If valid auth found, user will be logged in automatically
+        this.checkStoredAuth();
         
-        // Only setup auth UI if NOT authenticated
-        if (!wasAuthenticated) {
+        // Setup auth UI only if NOT authenticated
+        if (!this.isAuthenticated) {
             this.setupAuth();
-        }
-        
-        // Setup other features if authenticated
-        if (this.isAuthenticated) {
-            this.setupNavigation();
-            this.setupMainPage();
-            this.setupPersonalMode();
-            this.setupHistory();
-            this.setupChat();
-            this.setupNewChat();
-            this.setupAddEntry();
-            this.setupTrophy();
-            this.setupGroupOverview();
-            this.setupCalendar();
-            this.setupMemberStats();
-            this.setupWallet();
-            this.startWalletUpdates();
-            this.showSection('main');
-            this.updateAll();
-        } else {
             this.showSection('auth');
         }
     }
@@ -1606,11 +1587,6 @@ class App {
     }
 
     setupAuth() {
-        // Check if user is already logged in
-        if (this.checkStoredAuth()) {
-            return; // Already authenticated, skip setup
-        }
-
         // Firebase Google login (real online)
         const googleLoginBtn = document.getElementById('googleLoginBtn');
         if (googleLoginBtn) {
