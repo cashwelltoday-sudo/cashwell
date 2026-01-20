@@ -995,9 +995,15 @@ class App {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        this.setupAuth();
+        // Check stored auth first (this sets isAuthenticated if valid)
+        const wasAuthenticated = this.checkStoredAuth();
         
-        // Only setup other features if authenticated
+        // Only setup auth UI if NOT authenticated
+        if (!wasAuthenticated) {
+            this.setupAuth();
+        }
+        
+        // Setup other features if authenticated
         if (this.isAuthenticated) {
             this.setupNavigation();
             this.setupMainPage();
@@ -1679,11 +1685,6 @@ class App {
                 const auth = JSON.parse(storedAuth);
                 // Check if auth hasn't expired (30 days)
                 if (auth.expires && new Date(auth.expires) > new Date()) {
-                    this.isAuthenticated = true;
-                    this.userRole = auth.role;
-                    this.userEmail = auth.email;
-                    this.userName = auth.name;
-                    
                     // Add user as member if they don't exist (pass uid for cloud sync)
                     const member = this.dataManager.addMemberIfNotExists(auth.email, auth.name, auth.uid);
                     this.currentMemberId = auth.uid || member.id;
@@ -1692,8 +1693,16 @@ class App {
                     if (this.dataManager.isCloudEnabled() && auth.uid) {
                         this.dataManager.cloudUpsertMember({ uid: auth.uid, email: auth.email, name: auth.name }).catch(() => {});
                         if (this.cloudUnsubscribe) this.cloudUnsubscribe();
-                        this.cloudUnsubscribe = this.dataManager.subscribeToCloud(() => this.updateAll());
+                        this.cloudUnsubscribe = this.dataManager.subscribeToCloud(() => {
+                            if (window.app) window.app.updateAll();
+                        });
                     }
+                    
+                    // Now set authenticated state
+                    this.isAuthenticated = true;
+                    this.userRole = auth.role;
+                    this.userEmail = auth.email;
+                    this.userName = auth.name;
                     
                     // Setup all features
                     this.setupNavigation();
@@ -1729,7 +1738,7 @@ class App {
     login(email, role, rememberLogin = false, name = null, uid = null) {
         this.isAuthenticated = true;
         this.userRole = role;
-        this.userEmail = email || `user_${Date.now()}`; // Fallback if no email
+        this.userEmail = email || `user_${Date.now()}`;
         this.userName = name || `User_${Date.now()}`;
         
         // Add user as member if they don't exist (pass uid for cloud sync)
@@ -1740,13 +1749,15 @@ class App {
         if (this.dataManager.isCloudEnabled() && uid) {
             this.dataManager.cloudUpsertMember({ uid, email: this.userEmail, name: this.userName }).catch(() => {});
             if (this.cloudUnsubscribe) this.cloudUnsubscribe();
-            this.cloudUnsubscribe = this.dataManager.subscribeToCloud(() => this.updateAll());
+            this.cloudUnsubscribe = this.dataManager.subscribeToCloud(() => {
+                if (window.app) window.app.updateAll();
+            });
         }
         
         // Store auth if rememberLogin is checked
         if (rememberLogin) {
             const expires = new Date();
-            expires.setDate(expires.getDate() + 30); // 30 days
+            expires.setDate(expires.getDate() + 30);
             localStorage.setItem('cashwellAuth', JSON.stringify({
                 email: this.userEmail,
                 role: role,
