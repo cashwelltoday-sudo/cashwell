@@ -1644,6 +1644,7 @@ class App {
                 
                 newForm.addEventListener('submit', (e) => {
                     e.preventDefault();
+                    alert('Formulier wordt verzonden...');
                     console.log('Form submitted');
                     const accessCode = document.getElementById('authAccessCode').value;
                     const rememberLogin = document.getElementById('rememberLogin').checked;
@@ -1659,6 +1660,7 @@ class App {
                         return;
                     }
                     
+                    alert('Login succesvol met rol: ' + role);
                     console.log('Login with role:', role);
                     
                     // Access-code-only login is only local (no cross-device). Still requires username once.
