@@ -8,17 +8,15 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Firebase (real online auth + realtime database) -->
     <script>
-        // TODO: Vul jouw Firebase config in (Firebase Console -> Project settings -> SDK setup)
-        // Belangrijk: zet ook in Firebase Console -> Authentication -> Sign-in method -> Google aan.
-        // Belangrijk: zet in Firestore Rules tijdelijk test-mode of correcte rules (later beveiligen).
-        window.CASHWELL_FIREBASE_CONFIG = null;
-        // Voorbeeld:
-        // window.CASHWELL_FIREBASE_CONFIG = {
-        //   apiKey: "…",
-        //   authDomain: "…",
-        //   projectId: "…",
-        //   appId: "…"
-        // };
+        // Firebase config voor cashwell-3e435
+        window.CASHWELL_FIREBASE_CONFIG = {
+          apiKey: "AIzaSyCqvu0oT8Lggi-bhseA7bnFOtGJcCo8C30",
+          authDomain: "cashwell-3e435.firebaseapp.com",
+          projectId: "cashwell-3e435",
+          storageBucket: "cashwell-3e435.firebasestorage.app",
+          messagingSenderId: "489808422419",
+          appId: "1:489808422419:web:c127a4e53b4b7111b181e6"
+        };
         // Kies een vaste “group id” (kan later dynamisch)
         window.CASHWELL_GROUP_ID = "default";
     </script>
