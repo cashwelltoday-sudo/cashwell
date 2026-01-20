@@ -1784,6 +1784,9 @@ class App {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.nav-icon').forEach(btn => btn.classList.remove('active'));
         document.getElementById('auth').classList.add('active');
+        
+        // Force show auth section
+        this.showSection('auth');
     }
 
     validateAccessCode(input) {
@@ -3590,4 +3593,28 @@ window.handleGoogleSignIn = function(response) {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new App();
+    
+    // Fallback: Always attach logout handler regardless of app state
+    setTimeout(() => {
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            // Remove existing listeners by cloning
+            const newLogoutBtn = logoutBtn.cloneNode(true);
+            logoutBtn.parentNode.replaceChild(newLogoutBtn, logoutBtn);
+            
+            newLogoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm('Weet je zeker dat je wilt uitloggen?')) {
+                    if (window.app) {
+                        window.app.logout();
+                    } else {
+                        // Fallback logout if app isn't ready
+                        localStorage.removeItem('cashwellAuth');
+                        location.reload();
+                    }
+                }
+            });
+        }
+    }, 1000); // Wait for app to initialize
 });
