@@ -998,17 +998,12 @@ class App {
         // Check stored auth AFTER DataManager is ready
         this.checkStoredAuth();
         
-        // Only setup auth UI if NOT authenticated
-        if (!this.isAuthenticated) {
-            this.setupAuth();
-        }
+        // ALWAYS show auth section first for security
+        // User must explicitly log in
+        this.showSection('auth');
         
-        // Always show the correct section
-        if (this.isAuthenticated) {
-            this.showSection('main');
-        } else {
-            this.showSection('auth');
-        }
+        // Setup auth UI (will be skipped if already authenticated)
+        this.setupAuth();
     }
 
     startWalletUpdates() {
@@ -1592,84 +1587,86 @@ class App {
     }
 
     setupAuth() {
-        // Skip if already authenticated
-        if (this.isAuthenticated) return;
-
-        // Firebase Google login (real online)
-        const googleLoginBtn = document.getElementById('googleLoginBtn');
-        if (googleLoginBtn) {
-            // Remove existing listeners
-            const newGoogleBtn = googleLoginBtn.cloneNode(true);
-            googleLoginBtn.parentNode.replaceChild(newGoogleBtn, googleLoginBtn);
-            
-            newGoogleBtn.addEventListener('click', async () => {
-                // 1) Always require access code ONCE
-                const accessCode = prompt('Voer je access code in:');
-                if (!accessCode) return;
-                const role = this.validateAccessCode(accessCode);
-                if (!role) {
-                    alert('Ongeldige access code');
-                    return;
-                }
-
-                // 2) Google login must be real -> requires Firebase config
-                if (!this.dataManager.isCloudEnabled()) {
-                    alert('Google login werkt pas als Firebase is ingesteld (CASHWELL_FIREBASE_CONFIG in index.html).');
-                    return;
-                }
-
-                try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    const result = await this.dataManager.auth.signInWithPopup(provider);
-                    const user = result.user;
-                    if (!user) {
-                        alert('Google login mislukt.');
+        // ALWAYS setup the auth section (including logout button)
+        // The Google login part is skipped if already authenticated
+        
+        // Firebase Google login (real online) - only setup if not authenticated
+        if (!this.isAuthenticated) {
+            const googleLoginBtn = document.getElementById('googleLoginBtn');
+            if (googleLoginBtn) {
+                // Remove existing listeners
+                const newGoogleBtn = googleLoginBtn.cloneNode(true);
+                googleLoginBtn.parentNode.replaceChild(newGoogleBtn, googleLoginBtn);
+                
+                newGoogleBtn.addEventListener('click', async () => {
+                    // 1) Always require access code ONCE
+                    const accessCode = prompt('Voer je access code in:');
+                    if (!accessCode) return;
+                    const role = this.validateAccessCode(accessCode);
+                    if (!role) {
+                        alert('Ongeldige access code');
                         return;
                     }
 
-                    // 3) Username (display name) can be overridden
-                    const defaultName = user.displayName || user.email || 'User';
-                    let userName = prompt('Kies een gebruikersnaam:', defaultName);
-                    if (!userName || userName.trim() === '') userName = defaultName;
-                    userName = userName.trim();
+                    // 2) Google login must be real -> requires Firebase config
+                    if (!this.dataManager.isCloudEnabled()) {
+                        alert('Google login werkt pas als Firebase is ingesteld (CASHWELL_FIREBASE_CONFIG in index.html).');
+                        return;
+                    }
 
-                    this.login(user.email, role, document.getElementById('rememberLogin')?.checked || false, userName, user.uid);
-                } catch (e) {
-                    alert('Google login geblokkeerd/failed. Check Firebase Auth settings + domain/hosting.');
-                }
-            });
+                    try {
+                        const provider = new firebase.auth.GoogleAuthProvider();
+                        const result = await this.dataManager.auth.signInWithPopup(provider);
+                        const user = result.user;
+                        if (!user) {
+                            alert('Google login mislukt.');
+                            return;
+                        }
+
+                        // 3) Username (display name) can be overridden
+                        const defaultName = user.displayName || user.email || 'User';
+                        let userName = prompt('Kies een gebruikersnaam:', defaultName);
+                        if (!userName || userName.trim() === '') userName = defaultName;
+                        userName = userName.trim();
+
+                        this.login(user.email, role, document.getElementById('rememberLogin')?.checked || false, userName, user.uid);
+                    } catch (e) {
+                        alert('Google login geblokkeerd/failed. Check Firebase Auth settings + domain/hosting.');
+                    }
+                });
+            }
+
+            const authForm = document.getElementById('authForm');
+            if (authForm) {
+                // Remove existing listeners
+                const newForm = authForm.cloneNode(true);
+                authForm.parentNode.replaceChild(newForm, authForm);
+                
+                newForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const accessCode = document.getElementById('authAccessCode').value;
+                    const rememberLogin = document.getElementById('rememberLogin').checked;
+                    
+                    if (!accessCode) {
+                        alert('Voer een access code in');
+                        return;
+                    }
+                    
+                    const role = this.validateAccessCode(accessCode);
+                    if (!role) {
+                        alert('Ongeldige access code');
+                        return;
+                    }
+                    
+                    // Access-code-only login is only local (no cross-device). Still requires username once.
+                    const userName = (prompt('Voer je gebruikersnaam in:') || `User_${Date.now()}`).trim();
+                    const email = `local_${Date.now()}@cashwell.local`;
+                    this.login(email, role, rememberLogin, userName, null);
+                });
+            }
         }
 
-        const authForm = document.getElementById('authForm');
-        if (authForm) {
-            // Remove existing listeners
-            const newForm = authForm.cloneNode(true);
-            authForm.parentNode.replaceChild(newForm, authForm);
-            
-            newForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const accessCode = document.getElementById('authAccessCode').value;
-                const rememberLogin = document.getElementById('rememberLogin').checked;
-                
-                if (!accessCode) {
-                    alert('Voer een access code in');
-                    return;
-                }
-                
-                const role = this.validateAccessCode(accessCode);
-                if (!role) {
-                    alert('Ongeldige access code');
-                    return;
-                }
-                
-                // Access-code-only login is only local (no cross-device). Still requires username once.
-                const userName = (prompt('Voer je gebruikersnaam in:') || `User_${Date.now()}`).trim();
-                const email = `local_${Date.now()}@cashwell.local`;
-                this.login(email, role, rememberLogin, userName, null);
-            });
-        }
-
-        // Add logout button handler for auth section
+        // Add logout button handler for auth section - ALWAYS set this up
         const authLogoutBtn = document.getElementById('authLogoutBtn');
         if (authLogoutBtn) {
             const newLogoutBtn = authLogoutBtn.cloneNode(true);
@@ -1704,13 +1701,13 @@ class App {
                         });
                     }
                     
-                    // Now set authenticated state
+                    // Set authenticated state (but DON'T show main yet - init() will show auth first)
                     this.isAuthenticated = true;
                     this.userRole = auth.role;
                     this.userEmail = auth.email;
                     this.userName = auth.name;
                     
-                    // Setup all features
+                    // Setup all features (so they're ready when user logs in)
                     this.setupNavigation();
                     this.setupMainPage();
                     this.setupPersonalMode();
@@ -1726,8 +1723,6 @@ class App {
                     this.startWalletUpdates();
                     
                     document.getElementById('auth').classList.remove('active');
-                    this.showSection('main');
-                    this.updateAll();
                     return true;
                 } else {
                     localStorage.removeItem('cashwellAuth');
@@ -1772,6 +1767,9 @@ class App {
             expires: expires.toISOString()
         }));
         
+        // Add logged-in class to body for CSS styling
+        document.body.classList.add('logged-in');
+        
         // Setup all features after login
         this.setupNavigation();
         this.setupMainPage();
@@ -1807,6 +1805,9 @@ class App {
             this.dataManager.auth.signOut().catch(() => {});
         }
         localStorage.removeItem('cashwellAuth');
+        
+        // Remove logged-in class from body
+        document.body.classList.remove('logged-in');
         
         // Force page reload to completely reset the app state
         // This ensures all cached data and app state is cleared

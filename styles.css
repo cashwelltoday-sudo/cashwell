@@ -48,6 +48,37 @@ body {
     background: rgba(10, 10, 15, 0.8);
     backdrop-filter: blur(10px);
     border-right: 1px solid var(--border-color);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Hide navigation when auth section is active */
+body:not(.logged-in) .nav-container {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(-100%);
+}
+
+/* Hide logout button when not logged in, but keep space */
+#logoutBtn {
+    margin-top: auto;
+}
+
+body:not(.logged-in) #logoutBtn {
+    display: none;
+}
+
+/* Content Container */
+.content-container {
+    margin-left: 80px;
+    padding: 2rem;
+    max-width: 1400px;
+    margin-right: auto;
+    transition: margin-left 0.3s ease;
+}
+
+/* Remove left margin when not logged in */
+body:not(.logged-in) .content-container {
+    margin-left: 0;
 }
 
 .nav-icon {
