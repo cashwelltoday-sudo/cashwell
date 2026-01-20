@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /groups/{groupId}/{document=**} {
+      // Allow read/write for all authenticated users in test mode
+      // TODO: Replace with stricter rules for production
+      allow read, write: if true;
+    }
+  }
+}
+

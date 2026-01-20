@@ -10,18 +10,20 @@ function getCurrentUserId() {
 
 class DataManager {
     constructor() {
-        // Data is now shared globally between all users
         this.initCloud();
-        this.entries = this.loadEntries();
-        this.customAssets = this.loadCustomAssets();
-        this.members = this.loadMembers();
-        this.walletAssets = this.loadWalletAssets();
-        this.chatMessages = this.loadChatMessages();
-        this.teamEvents = this.loadTeamEvents();
-        this.migrateGroupLossesToTransfers();
+        this.entries = [];
+        this.customAssets = [];
+        this.members = [];
+        this.walletAssets = [];
+        this.chatMessages = { group: [] };
+        this.teamEvents = [];
+        this.isInitialized = false;
+        
+        // Initialize data from cloud or local storage
+        this.initializeData();
     }
 
-    // Get storage key - data is now shared globally between all users
+    // Get storage key - for local backup fallback
     getStorageKey(key) {
         return `cashwell_${key}`;
     }
@@ -29,14 +31,19 @@ class DataManager {
     // ---------- Cloud (Firebase) ----------
     initCloud() {
         try {
-            if (!window.CASHWELL_FIREBASE_CONFIG) return;
+            if (!window.CASHWELL_FIREBASE_CONFIG) {
+                console.log('Firebase config not set, using local storage only');
+                return;
+            }
             if (!window.firebase) return;
             if (!firebase.apps || firebase.apps.length === 0) {
                 firebase.initializeApp(window.CASHWELL_FIREBASE_CONFIG);
             }
             this.auth = firebase.auth();
             this.db = firebase.firestore();
+            console.log('Firebase initialized successfully');
         } catch (e) {
+            console.error('Firebase init error:', e);
             this.auth = null;
             this.db = null;
         }
@@ -56,6 +63,65 @@ class DataManager {
 
     memberDocIdFromUid(uid) {
         return uid;
+    }
+
+    async initializeData() {
+        if (this.isCloudEnabled()) {
+            // Load initial data from cloud
+            await this.loadAllFromCloud();
+            // Subscribe to realtime updates
+            this.subscribeToCloud(() => {
+                // Refresh UI when data changes
+                if (window.app) window.app.updateAll();
+            });
+        } else {
+            // Fallback to local storage
+            this.loadAllFromLocal();
+        }
+        this.isInitialized = true;
+    }
+
+    async loadAllFromCloud() {
+        try {
+            const group = this.groupRef();
+            
+            // Load members
+            const membersSnap = await group.collection('members').get();
+            this.members = membersSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+            
+            // Load entries
+            const entriesSnap = await group.collection('entries').orderBy('timestamp', 'asc').get();
+            this.entries = entriesSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+            
+            // Load wallet assets
+            const walletSnap = await group.collection('walletAssets').get();
+            this.walletAssets = walletSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+            
+            // Load custom assets
+            const assetsSnap = await group.collection('customAssets').get();
+            this.customAssets = assetsSnap.docs.map(d => d.data()).map(a => a.name);
+            
+            // Load team events
+            const eventsSnap = await group.collection('teamEvents').get();
+            this.teamEvents = eventsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+            
+            // Load group chat
+            const chatSnap = await group.collection('chat').doc('group').collection('messages').orderBy('timestamp', 'asc').get();
+            this.chatMessages = { group: chatSnap.docs.map(d => d.data()) };
+            
+        } catch (e) {
+            console.error('Error loading from cloud:', e);
+            this.loadAllFromLocal();
+        }
+    }
+
+    loadAllFromLocal() {
+        this.entries = this.loadEntries();
+        this.customAssets = this.loadCustomAssets();
+        this.members = this.loadMembers();
+        this.walletAssets = this.loadWalletAssets();
+        this.chatMessages = this.loadChatMessages();
+        this.teamEvents = this.loadTeamEvents();
     }
 
     async cloudUpsertMember({ uid, email, name }) {
@@ -79,28 +145,50 @@ class DataManager {
         const unsubscribers = [];
         const group = this.groupRef();
 
+        // Subscribe to members
         unsubscribers.push(
             group.collection('members').onSnapshot((snap) => {
                 this.members = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-                this.saveMembers();
                 onChange?.();
             })
         );
 
+        // Subscribe to entries
         unsubscribers.push(
             group.collection('entries').orderBy('timestamp', 'asc').onSnapshot((snap) => {
                 this.entries = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-                this.saveEntries();
                 onChange?.();
             })
         );
 
+        // Subscribe to wallet assets
+        unsubscribers.push(
+            group.collection('walletAssets').onSnapshot((snap) => {
+                this.walletAssets = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+                onChange?.();
+            })
+        );
+
+        // Subscribe to custom assets
+        unsubscribers.push(
+            group.collection('customAssets').onSnapshot((snap) => {
+                this.customAssets = snap.docs.map(d => d.data().name);
+                onChange?.();
+            })
+        );
+
+        // Subscribe to team events
+        unsubscribers.push(
+            group.collection('teamEvents').onSnapshot((snap) => {
+                this.teamEvents = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+                onChange?.();
+            })
+        );
+
+        // Subscribe to group chat
         unsubscribers.push(
             group.collection('chat').doc('group').collection('messages').orderBy('timestamp', 'asc').onSnapshot((snap) => {
-                const msgs = snap.docs.map((d) => d.data());
-                this.chatMessages = this.chatMessages || {};
-                this.chatMessages.group = msgs;
-                this.saveChatMessages();
+                this.chatMessages = { group: snap.docs.map((d) => d.data()) };
                 onChange?.();
             })
         );
@@ -108,16 +196,21 @@ class DataManager {
         return () => unsubscribers.forEach((u) => u && u());
     }
 
+    // ---------- Entries ----------
     async cloudAddEntry(entry) {
         if (!this.isCloudEnabled()) return null;
         const ref = await this.groupRef().collection('entries').add(entry);
         return ref.id;
     }
 
-    async cloudAddGroupChatMessage(message) {
-        if (!this.isCloudEnabled()) return null;
-        const ref = await this.groupRef().collection('chat').doc('group').collection('messages').add(message);
-        return ref.id;
+    async cloudUpdateEntry(entryId, data) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('entries').doc(entryId).update(data);
+    }
+
+    async cloudDeleteEntry(entryId) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('entries').doc(entryId).delete();
     }
 
     loadEntries() {
@@ -129,13 +222,75 @@ class DataManager {
         localStorage.setItem(this.getStorageKey('entries'), JSON.stringify(this.entries));
     }
 
-    loadCustomAssets() {
-        const stored = localStorage.getItem(this.getStorageKey('customAssets'));
-        return stored ? JSON.parse(stored) : [];
+    addEntry(entry) {
+        entry.id = Date.now().toString();
+        entry.timestamp = Date.now();
+        this.entries.push(entry);
+        this.saveEntries();
+        
+        // Update member amounts
+        this.updateMemberAmounts(entry);
+        
+        // Add to cloud if enabled
+        if (this.isCloudEnabled()) {
+            this.cloudAddEntry(entry);
+        }
+        
+        return entry;
     }
 
-    saveCustomAssets() {
-        localStorage.setItem(this.getStorageKey('customAssets'), JSON.stringify(this.customAssets));
+    updateEntry(entryId, updatedEntry) {
+        const index = this.entries.findIndex(e => e.id === entryId);
+        if (index !== -1) {
+            const oldEntry = this.entries[index];
+            
+            // Revert old entry's impact on members
+            this.revertMemberAmounts(oldEntry);
+            
+            // Update entry
+            updatedEntry.id = entryId;
+            updatedEntry.timestamp = oldEntry.timestamp;
+            this.entries[index] = updatedEntry;
+            this.saveEntries();
+            
+            // Apply new entry's impact on members
+            this.updateMemberAmounts(updatedEntry);
+            
+            // Update in cloud if enabled
+            if (this.isCloudEnabled()) {
+                this.cloudUpdateEntry(entryId, updatedEntry);
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    deleteEntry(entryId) {
+        const index = this.entries.findIndex(e => e.id === entryId);
+        if (index !== -1) {
+            const entry = this.entries[index];
+            
+            // Revert entry's impact on members
+            this.revertMemberAmounts(entry);
+            
+            this.entries.splice(index, 1);
+            this.saveEntries();
+            
+            // Delete from cloud if enabled
+            if (this.isCloudEnabled()) {
+                this.cloudDeleteEntry(entryId);
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    // ---------- Members ----------
+    async cloudUpdateMember(memberId, data) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('members').doc(memberId).update(data);
     }
 
     loadMembers() {
@@ -143,7 +298,6 @@ class DataManager {
         if (stored) {
             return JSON.parse(stored);
         }
-        // Start with empty members - they will be added when users log in
         return [];
     }
 
@@ -152,15 +306,22 @@ class DataManager {
     }
 
     // Add a new member if they don't exist
-    addMemberIfNotExists(userEmail, userName) {
-        const memberId = `member_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        const existingMember = this.members.find(m => m.id === memberId || m.email === userEmail);
+    addMemberIfNotExists(userEmail, userName, uid = null) {
+        // Try to find by email first (cloud identifier)
+        let existingMember = this.members.find(m => m.email === userEmail);
+        
+        // Or by uid (for Google users)
+        if (!existingMember && uid) {
+            existingMember = this.members.find(m => m.uid === uid);
+        }
         
         if (!existingMember) {
+            const memberId = uid || `member_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
             const newMember = {
                 id: memberId,
                 name: userName || `User ${this.members.length + 1}`,
                 email: userEmail,
+                uid: uid || null,
                 amount: 0
             };
             this.members.push(newMember);
@@ -172,15 +333,112 @@ class DataManager {
         if (userName && existingMember.name !== userName) {
             existingMember.name = userName;
             this.saveMembers();
+            
+            // Update in cloud
+            if (this.isCloudEnabled()) {
+                this.cloudUpdateMember(existingMember.id, { name: userName });
+            }
         }
         
         return existingMember;
     }
 
+    revertMemberAmounts(entry) {
+        if (entry.owner === 'group') {
+            if (entry.type !== 'profit' && entry.type !== 'loss') {
+                return;
+            }
+            
+            const memberCount = this.members.length || 1;
+            
+            if (!entry.memberIds || entry.memberIds.length === 0) {
+                // Distribute across all members
+                const isProfit = entry.type === 'profit';
+                const share = isProfit ? -entry.amount / memberCount : entry.amount / memberCount;
+                this.members.forEach(member => {
+                    member.amount += share;
+                });
+            } else {
+                // Only for selected members
+                const isProfit = entry.type === 'profit';
+                const share = isProfit ? -entry.amount / entry.memberIds.length : entry.amount / entry.memberIds.length;
+                entry.memberIds.forEach(memberId => {
+                    const member = this.members.find(m => m.id === memberId);
+                    if (member) {
+                        member.amount += share;
+                    }
+                });
+            }
+            
+            this.saveMembers();
+            
+            // Update in cloud
+            if (this.isCloudEnabled()) {
+                this.members.forEach(member => {
+                    this.cloudUpdateMember(member.id, { amount: member.amount });
+                });
+            }
+        }
+    }
+
+    updateMemberAmounts(entry) {
+        if (entry.owner === 'group') {
+            if (entry.type !== 'profit' && entry.type !== 'loss') {
+                return;
+            }
+            
+            const memberCount = this.members.length || 1;
+            
+            if (!entry.memberIds || entry.memberIds.length === 0) {
+                // Distribute across all members
+                const isProfit = entry.type === 'profit';
+                const share = isProfit ? entry.amount / memberCount : -entry.amount / memberCount;
+                this.members.forEach(member => {
+                    member.amount += share;
+                });
+            } else {
+                // Only for selected members
+                const isProfit = entry.type === 'profit';
+                const share = isProfit ? entry.amount / entry.memberIds.length : -entry.amount / entry.memberIds.length;
+                entry.memberIds.forEach(memberId => {
+                    const member = this.members.find(m => m.id === memberId);
+                    if (member) {
+                        member.amount += share;
+                    }
+                });
+            }
+            
+            this.saveMembers();
+            
+            // Update in cloud
+            if (this.isCloudEnabled()) {
+                this.members.forEach(member => {
+                    this.cloudUpdateMember(member.id, { amount: member.amount });
+                });
+            }
+        }
+    }
+
+    // ---------- Wallet Assets ----------
+    async cloudAddWalletAsset(asset) {
+        if (!this.isCloudEnabled()) return null;
+        const ref = await this.groupRef().collection('walletAssets').add(asset);
+        return ref.id;
+    }
+
+    async cloudUpdateWalletAsset(id, data) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('walletAssets').doc(id).update(data);
+    }
+
+    async cloudDeleteWalletAsset(id) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('walletAssets').doc(id).delete();
+    }
+
     loadWalletAssets() {
         const stored = localStorage.getItem(this.getStorageKey('walletAssets'));
         let assets = stored ? JSON.parse(stored) : [];
-        // Migration: Ensure all assets have an ownerId (default to member1)
         assets = assets.map(a => ({ ...a, ownerId: a.ownerId || 'member1' }));
         return assets;
     }
@@ -191,10 +449,15 @@ class DataManager {
 
     addWalletAsset(asset) {
         asset.id = Date.now().toString();
-        // Default to member1 if no owner provided
         if (!asset.ownerId) asset.ownerId = 'member1';
         this.walletAssets.push(asset);
         this.saveWalletAssets();
+        
+        // Add to cloud if enabled
+        if (this.isCloudEnabled()) {
+            this.cloudAddWalletAsset(asset);
+        }
+        
         return asset;
     }
 
@@ -203,6 +466,12 @@ class DataManager {
         if (index !== -1) {
             this.walletAssets[index] = { ...this.walletAssets[index], ...updatedAsset };
             this.saveWalletAssets();
+            
+            // Update in cloud if enabled
+            if (this.isCloudEnabled()) {
+                this.cloudUpdateWalletAsset(id, updatedAsset);
+            }
+            
             return true;
         }
         return false;
@@ -213,9 +482,108 @@ class DataManager {
         if (index !== -1) {
             this.walletAssets.splice(index, 1);
             this.saveWalletAssets();
+            
+            // Delete from cloud if enabled
+            if (this.isCloudEnabled()) {
+                this.cloudDeleteWalletAsset(id);
+            }
+            
             return true;
         }
         return false;
+    }
+
+    // ---------- Custom Assets ----------
+    async cloudAddCustomAsset(name) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('customAssets').add({ name });
+    }
+
+    loadCustomAssets() {
+        const stored = localStorage.getItem(this.getStorageKey('customAssets'));
+        return stored ? JSON.parse(stored) : [];
+    }
+
+    saveCustomAssets() {
+        localStorage.setItem(this.getStorageKey('customAssets'), JSON.stringify(this.customAssets));
+    }
+
+    // ---------- Team Events ----------
+    async cloudAddTeamEvent(event) {
+        if (!this.isCloudEnabled()) return null;
+        const ref = await this.groupRef().collection('teamEvents').add(event);
+        return ref.id;
+    }
+
+    async cloudUpdateTeamEvent(eventId, data) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('teamEvents').doc(eventId).update(data);
+    }
+
+    async cloudDeleteTeamEvent(eventId) {
+        if (!this.isCloudEnabled()) return;
+        await this.groupRef().collection('teamEvents').doc(eventId).delete();
+    }
+
+    loadTeamEvents() {
+        const stored = localStorage.getItem(this.getStorageKey('teamEvents'));
+        return stored ? JSON.parse(stored) : [];
+    }
+
+    saveTeamEvents() {
+        localStorage.setItem(this.getStorageKey('teamEvents'), JSON.stringify(this.teamEvents));
+    }
+
+    addTeamEvent(event) {
+        event.id = Date.now().toString();
+        this.teamEvents.push(event);
+        this.saveTeamEvents();
+        
+        // Add to cloud if enabled
+        if (this.isCloudEnabled()) {
+            this.cloudAddTeamEvent(event);
+        }
+        
+        return event;
+    }
+
+    updateTeamEvent(eventId, updatedEvent) {
+        const index = this.teamEvents.findIndex(e => e.id === eventId);
+        if (index !== -1) {
+            this.teamEvents[index] = { ...this.teamEvents[index], ...updatedEvent };
+            this.saveTeamEvents();
+            
+            // Update in cloud if enabled
+            if (this.isCloudEnabled()) {
+                this.cloudUpdateTeamEvent(eventId, updatedEvent);
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    deleteTeamEvent(eventId) {
+        const index = this.teamEvents.findIndex(e => e.id === eventId);
+        if (index !== -1) {
+            this.teamEvents.splice(index, 1);
+            this.saveTeamEvents();
+            
+            // Delete from cloud if enabled
+            if (this.isCloudEnabled()) {
+                this.cloudDeleteTeamEvent(eventId);
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    // ---------- Chat Messages ----------
+    async cloudAddGroupChatMessage(message) {
+        if (!this.isCloudEnabled()) return null;
+        const ref = await this.groupRef().collection('chat').doc('group').collection('messages').add(message);
+        return ref.id;
     }
 
     loadChatMessages() {
@@ -228,137 +596,7 @@ class DataManager {
         localStorage.setItem(this.getStorageKey('chatMessages'), JSON.stringify(this.chatMessages));
     }
 
-    loadTeamEvents() {
-        const stored = localStorage.getItem(this.getStorageKey('teamEvents'));
-        return stored ? JSON.parse(stored) : [];
-    }
-
-    saveTeamEvents() {
-        localStorage.setItem(this.getStorageKey('teamEvents'), JSON.stringify(this.teamEvents));
-    }
-
-    resetGroupData() {
-        this.entries = this.entries.filter(e => e.owner !== 'group');
-        this.saveEntries();
-        this.members = this.members.map(m => ({ ...m, amount: 0 }));
-        this.saveMembers();
-    }
-
-    migrateGroupLossesToTransfers() {
-        let changed = false;
-        const me = this.members.find(m => m.id === 'member1');
-        this.entries.forEach(entry => {
-            if (entry.owner === 'group' && entry.type === 'loss') {
-                this.revertMemberAmounts(entry);
-                entry.type = 'transfer';
-                entry.memberIds = ['member1'];
-                if (me) me.amount += entry.amount;
-                changed = true;
-            }
-        });
-        if (changed) {
-            this.saveEntries();
-            this.saveMembers();
-        }
-    }
-
-    addEntry(entry) {
-        entry.id = Date.now().toString();
-        entry.timestamp = Date.now();
-        this.entries.push(entry);
-        this.saveEntries();
-        this.updateMemberAmounts(entry);
-        return entry;
-    }
-
-    updateEntry(entryId, updatedEntry) {
-        const index = this.entries.findIndex(e => e.id === entryId);
-        if (index !== -1) {
-            const oldEntry = this.entries[index];
-            // Revert old entry's impact on members
-            this.revertMemberAmounts(oldEntry);
-            
-            // Update entry
-            updatedEntry.id = entryId;
-            updatedEntry.timestamp = oldEntry.timestamp; // Keep original timestamp
-            this.entries[index] = updatedEntry;
-            this.saveEntries();
-            
-            // Apply new entry's impact on members
-            this.updateMemberAmounts(updatedEntry);
-            return true;
-        }
-        return false;
-    }
-
-    deleteEntry(entryId) {
-        const index = this.entries.findIndex(e => e.id === entryId);
-        if (index !== -1) {
-            const entry = this.entries[index];
-            // Revert entry's impact on members
-            this.revertMemberAmounts(entry);
-            
-            this.entries.splice(index, 1);
-            this.saveEntries();
-            return true;
-        }
-        return false;
-    }
-
-    revertMemberAmounts(entry) {
-        if (entry.owner === 'group') {
-            if (entry.type !== 'profit' && entry.type !== 'loss') {
-                return;
-            }
-            // Backwards compatibility: if no memberIds, revert from all members
-            if (!entry.memberIds || entry.memberIds.length === 0) {
-                const isProfit = entry.type === 'profit';
-                const share = isProfit ? -entry.amount / this.members.length : entry.amount / this.members.length;
-                this.members.forEach(member => {
-                    member.amount += share;
-                });
-            } else {
-                // Revert the share distribution only for selected members
-                const isProfit = entry.type === 'profit';
-                const share = isProfit ? -entry.amount / entry.memberIds.length : entry.amount / entry.memberIds.length;
-                entry.memberIds.forEach(memberId => {
-                    const member = this.members.find(m => m.id === memberId);
-                    if (member) {
-                        member.amount += share;
-                    }
-                });
-            }
-            this.saveMembers();
-        }
-    }
-
-    updateMemberAmounts(entry) {
-        if (entry.owner === 'group') {
-            if (entry.type !== 'profit' && entry.type !== 'loss') {
-                return;
-            }
-            // Backwards compatibility: if no memberIds, distribute to all members
-            if (!entry.memberIds || entry.memberIds.length === 0) {
-                const isProfit = entry.type === 'profit';
-                const share = isProfit ? entry.amount / this.members.length : -entry.amount / this.members.length;
-                this.members.forEach(member => {
-                    member.amount += share;
-                });
-            } else {
-                // Distribute equally among selected members only
-                const isProfit = entry.type === 'profit';
-                const share = isProfit ? entry.amount / entry.memberIds.length : -entry.amount / entry.memberIds.length;
-                entry.memberIds.forEach(memberId => {
-                    const member = this.members.find(m => m.id === memberId);
-                    if (member) {
-                        member.amount += share;
-                    }
-                });
-            }
-            this.saveMembers();
-        }
-    }
-
+    // ---------- Utility Methods ----------
     getPersonalEntries() {
         return this.entries.filter(e => e.owner === 'myself');
     }
@@ -747,10 +985,16 @@ class App {
         this.bannedEmails = [];
         this.cloudUnsubscribe = null;
 
+        // Wait for DataManager to initialize before setting up
         this.init();
     }
 
-    init() {
+    async init() {
+        // Wait for DataManager to be initialized (cloud or local)
+        while (!this.dataManager.isInitialized) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
         this.setupAuth();
         
         // Only setup other features if authenticated
@@ -1440,11 +1684,8 @@ class App {
                     this.userEmail = auth.email;
                     this.userName = auth.name;
                     
-                    // Initialize DataManager (data is now shared globally)
-                    this.dataManager = new DataManager();
-                    
-                    // Add user as member if they don't exist
-                    const member = this.dataManager.addMemberIfNotExists(auth.email, auth.name);
+                    // Add user as member if they don't exist (pass uid for cloud sync)
+                    const member = this.dataManager.addMemberIfNotExists(auth.email, auth.name, auth.uid);
                     this.currentMemberId = auth.uid || member.id;
 
                     // If cloud is enabled + uid present, subscribe
@@ -1491,11 +1732,8 @@ class App {
         this.userEmail = email || `user_${Date.now()}`; // Fallback if no email
         this.userName = name || `User_${Date.now()}`;
         
-        // Initialize DataManager (data is now shared globally)
-        this.dataManager = new DataManager();
-        
-        // Add user as member if they don't exist
-        const member = this.dataManager.addMemberIfNotExists(this.userEmail, this.userName);
+        // Add user as member if they don't exist (pass uid for cloud sync)
+        const member = this.dataManager.addMemberIfNotExists(this.userEmail, this.userName, uid);
         this.currentMemberId = uid || member.id;
 
         // If cloud is enabled, upsert member + subscribe to realtime updates
