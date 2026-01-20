@@ -1668,6 +1668,20 @@ class App {
                 this.login(email, role, rememberLogin, userName, null);
             });
         }
+
+        // Add logout button handler for auth section
+        const authLogoutBtn = document.getElementById('authLogoutBtn');
+        if (authLogoutBtn) {
+            const newLogoutBtn = authLogoutBtn.cloneNode(true);
+            authLogoutBtn.parentNode.replaceChild(newLogoutBtn, authLogoutBtn);
+            
+            newLogoutBtn.addEventListener('click', () => {
+                if (confirm('Weet je zeker dat je wilt uitloggen en alle data wilt wissen?')) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            });
+        }
     }
 
     checkStoredAuth() {
