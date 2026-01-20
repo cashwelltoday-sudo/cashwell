@@ -4,8 +4,8 @@ function getCurrentUserId() {
 }
 
 class DataManager {
-    constructor(userEmail = null) {
-        this.userEmail = userEmail;
+    constructor() {
+        // Data is now shared globally between all users
         this.entries = this.loadEntries();
         this.customAssets = this.loadCustomAssets();
         this.members = this.loadMembers();
@@ -15,11 +15,8 @@ class DataManager {
         this.migrateGroupLossesToTransfers();
     }
 
-    // Get storage key prefix based on user email
+    // Get storage key - data is now shared globally between all users
     getStorageKey(key) {
-        if (this.userEmail) {
-            return `cashwell_${this.userEmail}_${key}`;
-        }
         return `cashwell_${key}`;
     }
 
@@ -46,16 +43,38 @@ class DataManager {
         if (stored) {
             return JSON.parse(stored);
         }
-        // Default members for new users
-        return [
-            { id: 'member1', name: 'Member 1', amount: 0 },
-            { id: 'member2', name: 'Member 2', amount: 0 },
-            { id: 'member3', name: 'Member 3', amount: 0 }
-        ];
+        // Start with empty members - they will be added when users log in
+        return [];
     }
 
     saveMembers() {
         localStorage.setItem(this.getStorageKey('members'), JSON.stringify(this.members));
+    }
+
+    // Add a new member if they don't exist
+    addMemberIfNotExists(userEmail, userName) {
+        const memberId = `member_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const existingMember = this.members.find(m => m.id === memberId || m.email === userEmail);
+        
+        if (!existingMember) {
+            const newMember = {
+                id: memberId,
+                name: userName || `User ${this.members.length + 1}`,
+                email: userEmail,
+                amount: 0
+            };
+            this.members.push(newMember);
+            this.saveMembers();
+            return newMember;
+        }
+        
+        // Update name if it changed
+        if (userName && existingMember.name !== userName) {
+            existingMember.name = userName;
+            this.saveMembers();
+        }
+        
+        return existingMember;
     }
 
     loadWalletAssets() {
@@ -1331,9 +1350,10 @@ class App {
                     return;
                 }
                 
-                // For access code only login, use a generated email
+                // For access code only login, ask for username
+                const userName = prompt('Voer je gebruikersnaam in:') || `User_${Date.now()}`;
                 const email = `user_${Date.now()}@cashwell.local`;
-                this.login(email, role, rememberLogin);
+                this.login(email, role, rememberLogin, userName.trim());
             });
         }
     }
@@ -1350,8 +1370,12 @@ class App {
                     this.userEmail = auth.email;
                     this.userName = auth.name;
                     
-                    // Initialize DataManager with user email
-                    this.dataManager = new DataManager(auth.email);
+                    // Initialize DataManager (data is now shared globally)
+                    this.dataManager = new DataManager();
+                    
+                    // Add user as member if they don't exist
+                    const member = this.dataManager.addMemberIfNotExists(auth.email, auth.name);
+                    this.currentMemberId = member.id;
                     
                     // Setup all features
                     this.setupNavigation();
@@ -1408,8 +1432,15 @@ class App {
                 return;
             }
             
+            // Ask for username
+            let userName = prompt(`Kies een gebruikersnaam:\n\nJe Google naam: ${name}\n\nVoer je gewenste gebruikersnaam in:`, name || '');
+            if (!userName || userName.trim() === '') {
+                userName = name || `User_${Date.now()}`;
+            }
+            userName = userName.trim();
+            
             const rememberLogin = confirm('Wil je ingelogd blijven?');
-            this.login(email, role, rememberLogin, name);
+            this.login(email, role, rememberLogin, userName);
         }
     }
 
@@ -1417,10 +1448,14 @@ class App {
         this.isAuthenticated = true;
         this.userRole = role;
         this.userEmail = email || `user_${Date.now()}`; // Fallback if no email
-        this.userName = name;
+        this.userName = name || `User_${Date.now()}`;
         
-        // Initialize DataManager with user email
-        this.dataManager = new DataManager(this.userEmail);
+        // Initialize DataManager (data is now shared globally)
+        this.dataManager = new DataManager();
+        
+        // Add user as member if they don't exist
+        const member = this.dataManager.addMemberIfNotExists(this.userEmail, this.userName);
+        this.currentMemberId = member.id;
         
         // Store auth if rememberLogin is checked
         if (rememberLogin) {
@@ -1429,7 +1464,8 @@ class App {
             localStorage.setItem('cashwellAuth', JSON.stringify({
                 email: this.userEmail,
                 role: role,
-                name: name,
+                name: this.userName,
+                memberId: member.id,
                 expires: expires.toISOString()
             }));
         }
