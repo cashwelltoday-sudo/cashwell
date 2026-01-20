@@ -6,7 +6,25 @@
     <title>Cashwell Group - Personal Money Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Google Sign-In script wordt alleen geladen als client_id is ingesteld -->
+    <!-- Firebase (real online auth + realtime database) -->
+    <script>
+        // TODO: Vul jouw Firebase config in (Firebase Console -> Project settings -> SDK setup)
+        // Belangrijk: zet ook in Firebase Console -> Authentication -> Sign-in method -> Google aan.
+        // Belangrijk: zet in Firestore Rules tijdelijk test-mode of correcte rules (later beveiligen).
+        window.CASHWELL_FIREBASE_CONFIG = null;
+        // Voorbeeld:
+        // window.CASHWELL_FIREBASE_CONFIG = {
+        //   apiKey: "…",
+        //   authDomain: "…",
+        //   projectId: "…",
+        //   appId: "…"
+        // };
+        // Kies een vaste “group id” (kan later dynamisch)
+        window.CASHWELL_GROUP_ID = "default";
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -594,23 +612,12 @@
         <h1 class="section-title">Sign In</h1>
         <div class="auth-container" style="max-width: 520px; margin: 0 auto;">
             <div class="auth-card">
-                <div id="googleSignInContainer" style="text-align: center; margin-bottom: 1.5rem; display: none;">
-                    <div id="g_id_onload"
-                         data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE"
-                         data-callback="handleGoogleSignIn"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin"
-                         data-type="standard"
-                         data-size="large"
-                         data-theme="outline"
-                         data-text="sign_in_with"
-                         data-shape="rectangular"
-                         data-logo_alignment="left"
-                         style="display: flex; justify-content: center;">
-                    </div>
+                <div style="text-align:center; margin-bottom: 1rem;">
+                    <button id="googleLoginBtn" class="add-btn" style="width:100%; justify-content:center;">
+                        Continue with Google
+                    </button>
                 </div>
-                <div id="authDivider" class="auth-divider" style="display: none;">
+                <div class="auth-divider">
                     <span>of</span>
                 </div>
                 <form id="authForm" class="entry-form">

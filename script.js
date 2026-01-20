@@ -1,11 +1,17 @@
 // Data Management
 function getCurrentUserId() {
+    if (window.app && window.app.currentMemberId) return window.app.currentMemberId;
+    try {
+        const auth = JSON.parse(localStorage.getItem('cashwellAuth') || 'null');
+        if (auth && auth.memberId) return auth.memberId;
+    } catch (e) {}
     return 'member1';
 }
 
 class DataManager {
     constructor() {
         // Data is now shared globally between all users
+        this.initCloud();
         this.entries = this.loadEntries();
         this.customAssets = this.loadCustomAssets();
         this.members = this.loadMembers();
@@ -18,6 +24,100 @@ class DataManager {
     // Get storage key - data is now shared globally between all users
     getStorageKey(key) {
         return `cashwell_${key}`;
+    }
+
+    // ---------- Cloud (Firebase) ----------
+    initCloud() {
+        try {
+            if (!window.CASHWELL_FIREBASE_CONFIG) return;
+            if (!window.firebase) return;
+            if (!firebase.apps || firebase.apps.length === 0) {
+                firebase.initializeApp(window.CASHWELL_FIREBASE_CONFIG);
+            }
+            this.auth = firebase.auth();
+            this.db = firebase.firestore();
+        } catch (e) {
+            this.auth = null;
+            this.db = null;
+        }
+    }
+
+    isCloudEnabled() {
+        return !!(this.auth && this.db);
+    }
+
+    getGroupId() {
+        return window.CASHWELL_GROUP_ID || 'default';
+    }
+
+    groupRef() {
+        return this.db.collection('groups').doc(this.getGroupId());
+    }
+
+    memberDocIdFromUid(uid) {
+        return uid;
+    }
+
+    async cloudUpsertMember({ uid, email, name }) {
+        if (!this.isCloudEnabled()) return null;
+        const ref = this.groupRef().collection('members').doc(this.memberDocIdFromUid(uid));
+        await ref.set(
+            {
+                uid,
+                email: email || null,
+                name: name || 'Unknown',
+                amount: 0,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            { merge: true }
+        );
+        return (await ref.get()).data();
+    }
+
+    subscribeToCloud(onChange) {
+        if (!this.isCloudEnabled()) return () => {};
+        const unsubscribers = [];
+        const group = this.groupRef();
+
+        unsubscribers.push(
+            group.collection('members').onSnapshot((snap) => {
+                this.members = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+                this.saveMembers();
+                onChange?.();
+            })
+        );
+
+        unsubscribers.push(
+            group.collection('entries').orderBy('timestamp', 'asc').onSnapshot((snap) => {
+                this.entries = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+                this.saveEntries();
+                onChange?.();
+            })
+        );
+
+        unsubscribers.push(
+            group.collection('chat').doc('group').collection('messages').orderBy('timestamp', 'asc').onSnapshot((snap) => {
+                const msgs = snap.docs.map((d) => d.data());
+                this.chatMessages = this.chatMessages || {};
+                this.chatMessages.group = msgs;
+                this.saveChatMessages();
+                onChange?.();
+            })
+        );
+
+        return () => unsubscribers.forEach((u) => u && u());
+    }
+
+    async cloudAddEntry(entry) {
+        if (!this.isCloudEnabled()) return null;
+        const ref = await this.groupRef().collection('entries').add(entry);
+        return ref.id;
+    }
+
+    async cloudAddGroupChatMessage(message) {
+        if (!this.isCloudEnabled()) return null;
+        const ref = await this.groupRef().collection('chat').doc('group').collection('messages').add(message);
+        return ref.id;
     }
 
     loadEntries() {
@@ -119,25 +219,22 @@ class DataManager {
     }
 
     loadChatMessages() {
-        return {
-            'group': [
-                { sender: 'System', message: 'Welcome to the group chat!', timestamp: Date.now() }
-            ],
-            'private-1': [],
-            'private-2': []
-        };
+        const stored = localStorage.getItem(this.getStorageKey('chatMessages'));
+        if (stored) return JSON.parse(stored);
+        return { group: [], 'private-1': [], 'private-2': [] };
     }
 
     saveChatMessages() {
-        return;
+        localStorage.setItem(this.getStorageKey('chatMessages'), JSON.stringify(this.chatMessages));
     }
 
     loadTeamEvents() {
-        return [];
+        const stored = localStorage.getItem(this.getStorageKey('teamEvents'));
+        return stored ? JSON.parse(stored) : [];
     }
 
     saveTeamEvents() {
-        return;
+        localStorage.setItem(this.getStorageKey('teamEvents'), JSON.stringify(this.teamEvents));
     }
 
     resetGroupData() {
@@ -646,7 +743,9 @@ class App {
         this.userRole = 'user';
         this.userEmail = null;
         this.userName = null;
+        this.currentMemberId = null;
         this.bannedEmails = [];
+        this.cloudUnsubscribe = null;
 
         this.init();
     }
@@ -1261,76 +1360,47 @@ class App {
         if (this.checkStoredAuth()) {
             return; // Already authenticated, skip setup
         }
-        
-        // Setup Google Sign-In callback (global function)
-        window.handleGoogleSignIn = (response) => {
-            this.handleGoogleSignIn(response);
-        };
 
-        // Initialize Google Sign-In only if client_id is provided
-        const initGoogleSignIn = () => {
-            const gIdOnload = document.getElementById('g_id_onload');
-            const googleContainer = document.getElementById('googleSignInContainer');
-            const authDivider = document.getElementById('authDivider');
-            
-            if (!gIdOnload || !googleContainer) return;
-            
-            const clientId = gIdOnload.getAttribute('data-client_id') || '';
-            
-            // Only show and initialize Google Sign-In if client_id is provided and valid
-            if (clientId && clientId.trim() !== '' && clientId !== 'YOUR_GOOGLE_CLIENT_ID') {
-                // Load Google Sign-In script dynamically only if not already loaded
-                if (typeof google === 'undefined' || !google.accounts) {
-                    // Check if script is already being loaded
-                    if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
-                        const script = document.createElement('script');
-                        script.src = 'https://accounts.google.com/gsi/client';
-                        script.async = true;
-                        script.defer = true;
-                        script.onload = () => {
-                            setTimeout(initGoogleSignIn, 200);
-                        };
-                        script.onerror = () => {
-                            // Hide Google Sign-In if script fails to load
-                            googleContainer.style.display = 'none';
-                            authDivider.style.display = 'none';
-                        };
-                        document.head.appendChild(script);
-                    } else {
-                        // Script is loading, retry later
-                        setTimeout(initGoogleSignIn, 200);
-                    }
+        // Firebase Google login (real online)
+        const googleLoginBtn = document.getElementById('googleLoginBtn');
+        if (googleLoginBtn) {
+            googleLoginBtn.addEventListener('click', async () => {
+                // 1) Always require access code ONCE
+                const accessCode = prompt('Voer je access code in:');
+                if (!accessCode) return;
+                const role = this.validateAccessCode(accessCode);
+                if (!role) {
+                    alert('Ongeldige access code');
                     return;
                 }
-                
-                // Initialize Google Sign-In
-                try {
-                    google.accounts.id.initialize({
-                        client_id: clientId,
-                        callback: handleGoogleSignIn
-                    });
-                    google.accounts.id.renderButton(
-                        document.querySelector('.g_id_signin'),
-                        { theme: 'outline', size: 'large' }
-                    );
-                    // Show Google Sign-In container and divider
-                    googleContainer.style.display = 'block';
-                    authDivider.style.display = 'flex';
-                } catch (error) {
-                    console.error('Google Sign-In initialization error:', error);
-                    // Hide Google Sign-In if initialization fails
-                    googleContainer.style.display = 'none';
-                    authDivider.style.display = 'none';
+
+                // 2) Google login must be real -> requires Firebase config
+                if (!this.dataManager.isCloudEnabled()) {
+                    alert('Google login werkt pas als Firebase is ingesteld (CASHWELL_FIREBASE_CONFIG in index.html).');
+                    return;
                 }
-            } else {
-                // Hide Google Sign-In if no client_id
-                googleContainer.style.display = 'none';
-                authDivider.style.display = 'none';
-            }
-        };
-        
-        // Start initialization after a short delay to ensure DOM is ready
-        setTimeout(initGoogleSignIn, 100);
+
+                try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    const result = await this.dataManager.auth.signInWithPopup(provider);
+                    const user = result.user;
+                    if (!user) {
+                        alert('Google login mislukt.');
+                        return;
+                    }
+
+                    // 3) Username (display name) can be overridden
+                    const defaultName = user.displayName || user.email || 'User';
+                    let userName = prompt('Kies een gebruikersnaam:', defaultName);
+                    if (!userName || userName.trim() === '') userName = defaultName;
+                    userName = userName.trim();
+
+                    this.login(user.email, role, document.getElementById('rememberLogin')?.checked || false, userName, user.uid);
+                } catch (e) {
+                    alert('Google login geblokkeerd/failed. Check Firebase Auth settings + domain/hosting.');
+                }
+            });
+        }
 
         const authForm = document.getElementById('authForm');
         if (authForm) {
@@ -1350,10 +1420,10 @@ class App {
                     return;
                 }
                 
-                // For access code only login, ask for username
-                const userName = prompt('Voer je gebruikersnaam in:') || `User_${Date.now()}`;
-                const email = `user_${Date.now()}@cashwell.local`;
-                this.login(email, role, rememberLogin, userName.trim());
+                // Access-code-only login is only local (no cross-device). Still requires username once.
+                const userName = (prompt('Voer je gebruikersnaam in:') || `User_${Date.now()}`).trim();
+                const email = `local_${Date.now()}@cashwell.local`;
+                this.login(email, role, rememberLogin, userName, null);
             });
         }
     }
@@ -1375,7 +1445,14 @@ class App {
                     
                     // Add user as member if they don't exist
                     const member = this.dataManager.addMemberIfNotExists(auth.email, auth.name);
-                    this.currentMemberId = member.id;
+                    this.currentMemberId = auth.uid || member.id;
+
+                    // If cloud is enabled + uid present, subscribe
+                    if (this.dataManager.isCloudEnabled() && auth.uid) {
+                        this.dataManager.cloudUpsertMember({ uid: auth.uid, email: auth.email, name: auth.name }).catch(() => {});
+                        if (this.cloudUnsubscribe) this.cloudUnsubscribe();
+                        this.cloudUnsubscribe = this.dataManager.subscribeToCloud(() => this.updateAll());
+                    }
                     
                     // Setup all features
                     this.setupNavigation();
@@ -1406,45 +1483,9 @@ class App {
         return false;
     }
 
-    handleGoogleSignIn(response) {
-        if (response && response.credential) {
-            // Decode JWT token to get user info
-            const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            const email = payload.email;
-            const name = payload.name;
-            
-            // Check if banned
-            if (this.bannedEmails.includes(email)) {
-                alert('Dit account is geblokkeerd. Neem contact op met de eigenaar.');
-                return;
-            }
-            
-            // Show access code prompt after Google login
-            const accessCode = prompt('Voer je access code in:');
-            if (!accessCode) {
-                alert('Access code is vereist');
-                return;
-            }
-            
-            const role = this.validateAccessCode(accessCode);
-            if (!role) {
-                alert('Ongeldige access code');
-                return;
-            }
-            
-            // Ask for username
-            let userName = prompt(`Kies een gebruikersnaam:\n\nJe Google naam: ${name}\n\nVoer je gewenste gebruikersnaam in:`, name || '');
-            if (!userName || userName.trim() === '') {
-                userName = name || `User_${Date.now()}`;
-            }
-            userName = userName.trim();
-            
-            const rememberLogin = confirm('Wil je ingelogd blijven?');
-            this.login(email, role, rememberLogin, userName);
-        }
-    }
+    // Google login is handled via Firebase popup in setupAuth()
 
-    login(email, role, rememberLogin = false, name = null) {
+    login(email, role, rememberLogin = false, name = null, uid = null) {
         this.isAuthenticated = true;
         this.userRole = role;
         this.userEmail = email || `user_${Date.now()}`; // Fallback if no email
@@ -1455,7 +1496,14 @@ class App {
         
         // Add user as member if they don't exist
         const member = this.dataManager.addMemberIfNotExists(this.userEmail, this.userName);
-        this.currentMemberId = member.id;
+        this.currentMemberId = uid || member.id;
+
+        // If cloud is enabled, upsert member + subscribe to realtime updates
+        if (this.dataManager.isCloudEnabled() && uid) {
+            this.dataManager.cloudUpsertMember({ uid, email: this.userEmail, name: this.userName }).catch(() => {});
+            if (this.cloudUnsubscribe) this.cloudUnsubscribe();
+            this.cloudUnsubscribe = this.dataManager.subscribeToCloud(() => this.updateAll());
+        }
         
         // Store auth if rememberLogin is checked
         if (rememberLogin) {
@@ -1466,6 +1514,7 @@ class App {
                 role: role,
                 name: this.userName,
                 memberId: member.id,
+                uid: uid || null,
                 expires: expires.toISOString()
             }));
         }
@@ -1496,6 +1545,14 @@ class App {
         this.userRole = 'user';
         this.userEmail = null;
         this.userName = null;
+        this.currentMemberId = null;
+        if (this.cloudUnsubscribe) {
+            this.cloudUnsubscribe();
+            this.cloudUnsubscribe = null;
+        }
+        if (this.dataManager?.isCloudEnabled()) {
+            this.dataManager.auth.signOut().catch(() => {});
+        }
         localStorage.removeItem('cashwellAuth');
         
         // Hide all sections and show auth
