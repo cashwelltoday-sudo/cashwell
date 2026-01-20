@@ -1794,13 +1794,11 @@ class App {
         }
         localStorage.removeItem('cashwellAuth');
         
-        // Hide all sections and show auth
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.nav-icon').forEach(btn => btn.classList.remove('active'));
-        document.getElementById('auth').classList.add('active');
-        
-        // Force show auth section
-        this.showSection('auth');
+        // Force page reload to completely reset the app state
+        // This ensures all cached data and app state is cleared
+        setTimeout(() => {
+            location.reload();
+        }, 100);
     }
 
     validateAccessCode(input) {
