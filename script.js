@@ -996,12 +996,17 @@ class App {
         }
         
         // Check stored auth AFTER DataManager is ready
-        // If valid auth found, user will be logged in automatically
         this.checkStoredAuth();
         
-        // Setup auth UI only if NOT authenticated
+        // Only setup auth UI if NOT authenticated
         if (!this.isAuthenticated) {
             this.setupAuth();
+        }
+        
+        // Always show the correct section
+        if (this.isAuthenticated) {
+            this.showSection('main');
+        } else {
             this.showSection('auth');
         }
     }
@@ -1587,10 +1592,17 @@ class App {
     }
 
     setupAuth() {
+        // Skip if already authenticated
+        if (this.isAuthenticated) return;
+
         // Firebase Google login (real online)
         const googleLoginBtn = document.getElementById('googleLoginBtn');
         if (googleLoginBtn) {
-            googleLoginBtn.addEventListener('click', async () => {
+            // Remove existing listeners
+            const newGoogleBtn = googleLoginBtn.cloneNode(true);
+            googleLoginBtn.parentNode.replaceChild(newGoogleBtn, googleLoginBtn);
+            
+            newGoogleBtn.addEventListener('click', async () => {
                 // 1) Always require access code ONCE
                 const accessCode = prompt('Voer je access code in:');
                 if (!accessCode) return;
@@ -1630,7 +1642,11 @@ class App {
 
         const authForm = document.getElementById('authForm');
         if (authForm) {
-            authForm.addEventListener('submit', (e) => {
+            // Remove existing listeners
+            const newForm = authForm.cloneNode(true);
+            authForm.parentNode.replaceChild(newForm, authForm);
+            
+            newForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const accessCode = document.getElementById('authAccessCode').value;
                 const rememberLogin = document.getElementById('rememberLogin').checked;
@@ -1730,19 +1746,17 @@ class App {
             });
         }
         
-        // Store auth if rememberLogin is checked
-        if (rememberLogin) {
-            const expires = new Date();
-            expires.setDate(expires.getDate() + 30);
-            localStorage.setItem('cashwellAuth', JSON.stringify({
-                email: this.userEmail,
-                role: role,
-                name: this.userName,
-                memberId: member.id,
-                uid: uid || null,
-                expires: expires.toISOString()
-            }));
-        }
+        // Always store auth (not just when rememberLogin is checked)
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 30);
+        localStorage.setItem('cashwellAuth', JSON.stringify({
+            email: this.userEmail,
+            role: role,
+            name: this.userName,
+            memberId: member.id,
+            uid: uid || null,
+            expires: expires.toISOString()
+        }));
         
         // Setup all features after login
         this.setupNavigation();
