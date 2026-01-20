@@ -1644,6 +1644,7 @@ class App {
                 
                 newForm.addEventListener('submit', (e) => {
                     e.preventDefault();
+                    console.log('Form submitted');
                     const accessCode = document.getElementById('authAccessCode').value;
                     const rememberLogin = document.getElementById('rememberLogin').checked;
                     
@@ -1654,9 +1655,11 @@ class App {
                     
                     const role = this.validateAccessCode(accessCode);
                     if (!role) {
-                        alert('Ongeldige access code');
+                        alert('Ongeldige access code. Gebruik: CASHwell!6,62.X voor owner of Cashw377! voor user');
                         return;
                     }
+                    
+                    console.log('Login with role:', role);
                     
                     // Access-code-only login is only local (no cross-device). Still requires username once.
                     const userName = (prompt('Voer je gebruikersnaam in:') || `User_${Date.now()}`).trim();
